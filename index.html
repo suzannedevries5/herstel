@@ -279,12 +279,27 @@ const VOOR = {
 const SOORT = {video:"Filmpje", foto:"Foto", audio:"Spraakbericht", tekst:"Tekst"};
 const voorOptions = sel => Object.entries(VOOR).map(([k,v]) => `<option value="${k}"${k===sel?" selected":""}>${v}</option>`).join("");
 const catOf = t => t.soort || (/wandel/i.test(t.naam) ? "wandelen" : "oefening");
-function pickMedia(cat){
-  let pool = videos.filter(v => v.voor === cat);
-  if (!pool.length && cat !== "ochtend") pool = videos.filter(v => v.voor === "altijd");
-  if (!pool.length && cat !== "ochtend") pool = videos.filter(v => v.voor !== "ochtend");
-  return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+const weekOptions = sel => `<option value="">Elke week</option>` + Array.from({length:MAXWEEK+1}, (_,w) => `<option value="${w}"${w===sel?" selected":""}>${w===0?"Voor de OK":"Week "+w}</option>`).join("");
+// Filmpjes, foto's en spraak die papa de afgelopen 7 dagen zag (tekst mag vaker terugkomen).
+function seenRecently(){
+  const from = addDays(day, -6), seen = new Set(log.gezien || []);
+  for (const r of recent) if (r.datum >= from) for (const id of r.gezien || []) seen.add(id);
+  return seen;
 }
+// Eerst iets voor dit moment én deze week, dan dit moment, dan "Altijd", dan alles behalve goedemorgen.
+function pickMedia(cat){
+  const seen = seenRecently(), w = weekOf(day);
+  const ok = v => (v.week == null || v.week === w) && (v.soort === "tekst" || !seen.has(v.id));
+  const tiers = [v => v.voor === cat && v.week === w, v => v.voor === cat];
+  if (cat !== "ochtend") tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => v.voor !== "ochtend");
+  for (const tier of tiers){
+    const pool = videos.filter(v => ok(v) && tier(v));
+    if (pool.length) return pool[Math.floor(Math.random()*pool.length)];
+  }
+  return null;
+}
+// Alleen wat papa zelf ziet telt als "gezien".
+const markSeen = (l, m) => me.rol === "deelnemer" && m && m.soort !== "tekst" ? {...l, gezien: [...(l.gezien || []), m.id]} : l;
 
 let canSetup = false, ready = false, me = {}, people = [];
 let weken = {}, videos = [], settings = {}, log = {}, recent = [], day = iso(new Date());
@@ -341,9 +356,11 @@ async function loadAll(){
 }
 // Eerste keer openen op een dag: een goedemorgen-bericht, alleen voor papa en alleen als er een is.
 async function greet(){
-  if (me.rol !== "deelnemer" || log.begroet || !videos.some(v => v.voor === "ochtend")) return;
-  log = {...log, begroet: true};
-  if (await saveLog(log)) showReward("Goedemorgen!", "", "ochtend", false);
+  if (me.rol !== "deelnemer" || log.begroet) return;
+  const m = pickMedia("ochtend");
+  if (!m) return;
+  log = markSeen({...log, begroet: true}, m);
+  if (await saveLog(log)) showMedia("Goedemorgen!", m);
 }
 async function saveLog(next){
   const {error} = await sb.from("log").upsert({datum: day, data: next});
@@ -476,11 +493,13 @@ function renderToday(){
 async function save(patch, reward){
   const wasKlaar = isKlaar(log, day);
   const prev = log;
-  const next = {...log, ...patch};
+  let next = {...log, ...patch};
   next.klaar = isKlaar(next, day);
+  let m = null;
+  if (next.klaar && !wasKlaar) m = showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!", "klaar");
+  else if (reward) m = showReward(reward.title || cheers[Math.floor(Math.random()*cheers.length)], reward.text || "", reward.cat);
+  next = markSeen(next, m);
   log = next; renderToday();
-  if (next.klaar && !wasKlaar) showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!", "klaar");
-  else if (reward) showReward(reward.title || cheers[Math.floor(Math.random()*cheers.length)], reward.text || "", reward.cat);
   if (!await saveLog(next)){ log = prev; renderToday(); return false; }
   return true;
 }
@@ -505,8 +524,10 @@ async function syncSteps(){
 addEventListener("hashchange", syncSteps);
 
 function showReward(title, text, cat, party = true){
-  showMedia(title, pickMedia(cat), text);
+  const m = pickMedia(cat);
+  showMedia(title, m, text);
   if (party) confetti();
+  return m;
 }
 // Eén scherm voor tekst, filmpje, foto of spraakbericht. Een eigen tekst vervangt de standaardtekst.
 function showMedia(title, m, text = ""){
@@ -602,7 +623,9 @@ function renderSetup(){
   for (const v of videos){
     const r = document.createElement("div"); r.className="item";
     const kop = v.soort === "tekst" ? v.tekst.slice(0,60) + (v.tekst.length > 60 ? "…" : "") : v.titel;
-    r.innerHTML = `<div><b>${esc(kop)}</b><small>${SOORT[v.soort] || "Filmpje"}${v.van?` van ${esc(v.van)}`:""}${v.tekst && v.soort!=="tekst" ? " · met tekst" : ""}</small></div><div><select aria-label="Moment">${voorOptions(v.voor)}</select><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
+    r.innerHTML = `<div><b>${esc(kop)}</b><small>${SOORT[v.soort] || "Filmpje"}${v.van?` van ${esc(v.van)}`:""}${v.tekst && v.soort!=="tekst" ? " · met tekst" : ""}</small></div><div><select aria-label="Moment">${voorOptions(v.voor)}</select><select class="wk" aria-label="Week">${weekOptions(v.week)}</select><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
+    const wk = r.querySelector(".wk");
+    wk.onchange = async () => { const week = wk.value === "" ? null : +wk.value; const {error} = await sb.from("filmpjes").update({week}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.week = week; };
     const sel = r.querySelector("select");
     sel.onchange = async () => { const {error} = await sb.from("filmpjes").update({voor: sel.value}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.voor = sel.value; };
     const [view, del] = r.querySelectorAll("button");
@@ -732,7 +755,10 @@ const fmtTime = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,
 // Zelfde uploader voor jou (Instellen) en de zussen (Stuur een berichtje).
 for (const box of document.querySelectorAll(".uploader")){
   box.innerHTML = `
-    <label>Bij welk moment?<select class="voor">${voorOptions("altijd")}</select></label>
+    <div class="row">
+      <label>Bij welk moment?<select class="voor">${voorOptions("altijd")}</select></label>
+      <label>Welke week?<select class="week">${weekOptions(null)}</select></label>
+    </div>
     <label>Tekst (optioneel)<textarea class="tekst" rows="2" maxlength="280" placeholder="Goed bezig pap, we zijn trots op je!"></textarea></label>
     <p class="note">Alleen tekst kan ook. Kies je hieronder iets, dan komt de tekst erbij te staan.</p>
     <label>Filmpjes of foto's kiezen<input type="file" class="upload" accept="video/*,image/*,audio/*" multiple></label>
@@ -740,7 +766,7 @@ for (const box of document.querySelectorAll(".uploader")){
     <button class="primary send" hidden>Versturen</button>
     <p class="note uploadMsg" aria-live="polite"></p>`;
   const inp = box.querySelector(".upload"), send = box.querySelector(".send"), msg = box.querySelector(".uploadMsg");
-  const recBtn = box.querySelector(".rec"), voor = box.querySelector(".voor"), tekst = box.querySelector(".tekst");
+  const recBtn = box.querySelector(".rec"), voor = box.querySelector(".voor"), weekSel = box.querySelector(".week"), tekst = box.querySelector(".tekst");
   let opnames = []; // ingesproken berichten die nog verstuurd moeten worden
   const refresh = () => {
     const n = inp.files.length + opnames.length;
@@ -785,7 +811,7 @@ for (const box of document.querySelectorAll(".uploader")){
     const txt = tekst.value.trim() || null;
     let ok = 0;
     if (!items.length && txt){ // alleen tekst
-      const {error} = await sb.from("filmpjes").insert({soort: "tekst", tekst: txt, titel: "Tekst", van: me.naam || null, voor: voor.value});
+      const {error} = await sb.from("filmpjes").insert({soort: "tekst", tekst: txt, titel: "Tekst", van: me.naam || null, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value});
       if (error) msg.textContent = `Versturen lukte niet (${error.message}).`; else ok++;
     }
     for (const [i, it] of items.entries()){
@@ -800,7 +826,7 @@ for (const box of document.querySelectorAll(".uploader")){
         const ext = {"video/mp4":"mp4","video/quicktime":"mov","image/jpeg":"jpg","image/png":"png","image/heic":"heic","audio/mp4":"m4a","audio/x-m4a":"m4a","audio/mpeg":"mp3","audio/webm":"webm"}[type] || (f.name?.split(".").pop() || "bin").toLowerCase();
         const pad = crypto.randomUUID() + "." + ext;
         const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: type});
-        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.naam, van: me.naam || null, soort, voor: voor.value, tekst: txt});
+        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.naam, van: me.naam || null, soort, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value, tekst: txt});
         if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet (${row.error.message}).`; else ok++;
       } catch {
         msg.textContent = `${it.naam} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
