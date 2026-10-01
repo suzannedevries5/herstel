@@ -60,7 +60,9 @@ button.link.danger{color:var(--danger)}
 .moods button.on{border-color:var(--brand);background:var(--glass);font-weight:700}
 .survived{border:2px solid var(--sun);text-align:center;align-items:center}
 button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
-.wgrid{display:grid;grid-template-columns:repeat(5,minmax(0,52px));gap:6px;justify-content:center}
+.wgrid{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,52px));gap:6px;justify-content:center}
+.wgrid.lang{gap:4px}
+.wgrid.lang .wtile{font-size:19px;border-radius:6px}
 .wtile{aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--line);border-radius:8px;font:800 26px var(--display);color:var(--ink)}
 .wtile.vol{border-color:var(--muted)}
 .wtile.goed,.wkbd .goed{background:var(--done);border-color:var(--done);color:#fff}
@@ -249,8 +251,9 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
     <div class="card">
       <h2>Woord van de dag</h2>
-      <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij een woord van 5 letters, in 6 pogingen. Hieronder staan de woorden in volgorde; je mag ze aanpassen. Alleen woorden van precies 5 letters tellen mee.</p>
-      <label>De woorden<textarea id="setPuzzel" rows="5"></textarea></label>
+      <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij één woord, in 6 pogingen. Zet hieronder <b>één woord per regel</b>, in de volgorde waarin hij ze krijgt. Woorden van 3 tot 10 letters; spaties en accenten tellen niet mee.</p>
+      <label>De woorden<textarea id="setPuzzel" rows="10"></textarea></label>
+      <p class="note" id="woordStand"></p>
       <button class="primary" id="savePuzzel">Woorden opslaan</button>
     </div>
 
@@ -612,17 +615,18 @@ function renderHistory(){
 }
 
 /* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
-const WOORDEN = "TAART ZOMER VOGEL STOEL HAVEN KAART LEPEL MOLEN PAARD BOTER KLOMP PIANO SCHIP FEEST ZWAAN BLOEM FIETS REGEN STORM KAARS SNOEP APPEL DRUIF BROOD HEMEL WATER VADER ZUSJE ANKER SLAAP";
+const WOORDEN = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAARS\nHAVEN\nZWAAN\nBROOD\nPAARD\nSCHIP";
 const POGINGEN = 6;
 const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-const woordenlijst = () => norm(settings.puzzel || WOORDEN).split(/[\s,]+/).filter(w => /^[A-Z]{5}$/.test(w));
+const woordenlijst = () => norm(settings.puzzel || WOORDEN).split(/[\n,;]+/).map(w => w.replace(/\s+/g, "")).filter(w => /^[A-Z]{3,10}$/.test(w));
+const woordNr = () => recent.filter(r => r.datum < day && r.puzzel).length;
 // Welk woord vandaag: telt door op gespeelde dagen, dus een dag overslaan = gewoon het volgende woord.
-const woordVanDaag = () => { const ws = woordenlijst(); return ws[recent.filter(r => r.datum < day && r.puzzel).length % ws.length]; };
+const woordVanDaag = () => { const ws = woordenlijst(); return ws[woordNr() % ws.length]; };
 // Per letter: "goed" (juiste plek), "bijna" (zit erin, andere plek) of "mis". Dubbele letters tellen niet dubbel.
 function score(gok, woord){
-  const uit = Array(5).fill("mis"), over = {};
-  for (let i = 0; i < 5; i++){ if (gok[i] === woord[i]) uit[i] = "goed"; else over[woord[i]] = (over[woord[i]] || 0) + 1; }
-  for (let i = 0; i < 5; i++) if (uit[i] !== "goed" && over[gok[i]] > 0){ uit[i] = "bijna"; over[gok[i]]--; }
+  const n = woord.length, uit = Array(n).fill("mis"), over = {};
+  for (let i = 0; i < n; i++){ if (gok[i] === woord[i]) uit[i] = "goed"; else over[woord[i]] = (over[woord[i]] || 0) + 1; }
+  for (let i = 0; i < n; i++) if (uit[i] !== "goed" && over[gok[i]] > 0){ uit[i] = "bijna"; over[gok[i]]--; }
   return uit;
 }
 const RANG = {mis: 1, bijna: 2, goed: 3};
@@ -631,12 +635,13 @@ function renderPuzzle(t){
   const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel;
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
-  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : "Raad het woord van 5 letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek."}</p>`;
-  const grid = document.createElement("div"); grid.className = "wgrid";
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
+  const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 7 ? " lang" : "");
+  grid.style.setProperty("--n", woord.length);
   for (let r = 0; r < POGINGEN; r++){
     const g = gokken[r], s = g ? score(g, woord) : null;
     const tekst = g || (r === gokken.length && !klaar ? invoer : "");
-    for (let i = 0; i < 5; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>`);
+    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>`);
   }
   card.appendChild(grid);
   if (klaar){
@@ -661,9 +666,10 @@ function renderPuzzle(t){
 }
 function toets(t, k){
   if (k === "DEL"){ invoer = invoer.slice(0, -1); renderToday(); return; }
-  if (k !== "OK"){ if (invoer.length < 5){ invoer += k; renderToday(); } return; }
-  if (invoer.length < 5){ toast("Typ eerst 5 letters"); return; }
-  const woord = woordVanDaag(), pogingen = [...(log.pogingen || []), invoer];
+  const woord = woordVanDaag();
+  if (k !== "OK"){ if (invoer.length < woord.length){ invoer += k; renderToday(); } return; }
+  if (invoer.length < woord.length){ toast(`Typ eerst ${woord.length} letters`); return; }
+  const pogingen = [...(log.pogingen || []), invoer];
   invoer = "";
   const gewonnen = pogingen.at(-1) === woord, op = pogingen.length >= POGINGEN;
   if (gewonnen || op) save({pogingen, puzzel: true, [t.id]: 1}, {cat: "puzzel", title: gewonnen ? "Geraden!" : "Bijna!", text: gewonnen ? "" : `Het woord was ${woord}. Morgen een nieuw woord.`});
@@ -768,6 +774,7 @@ function renderSetup(){
   $("setOp").value ||= settings.operatie || "";
   $("setWater").value ||= settings.water || "";
   $("setPuzzel").value ||= settings.puzzel || WOORDEN;
+  { const ws = woordenlijst(), i = woordNr(); $("woordStand").textContent = `${ws.length} woorden. Hij is bij woord ${i % ws.length + 1}: ${ws[i % ws.length] || "-"}${i >= ws.length ? " (de lijst begint opnieuw, zet er meer woorden bij)" : ""}.`; }
   if (setupWeek == null) setupWeek = weekOf(day);
 
   $("weeks").innerHTML = "";
