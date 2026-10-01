@@ -271,7 +271,8 @@ const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) +
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
 function show(which){
   for (const v of ["Login","Today","Setup","Family"]) $("view"+v).hidden = v.toLowerCase()!==which;
-  $("tabToday").className = which==="today"?"primary":""; $("tabSetup").className = which==="setup"?"primary":"";
+  const second = me.rol === "familie" ? "family" : "setup";
+  $("tabToday").className = which==="today"?"primary":""; $("tabSetup").className = which===second?"primary":"";
   if (which==="setup") renderSetup();
 }
 
@@ -455,7 +456,7 @@ $("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, 
 // De iPhone-opdracht opent de app als ...#stappen1234. Tolerant voor "4,231" of "4231.0".
 async function syncSteps(){
   const m = decodeURIComponent(location.hash).match(/^#stappen([\d.,\s]+)/i);
-  if (!m || !ready) return;
+  if (!m || !ready || me.rol === "familie") return;
   const n = parseInt(m[1].replace(/[.,]0+$/,"").replace(/\D/g,""), 10);
   if (!n || log.stappen === n) return;
   log = {...log, stappen: n}; renderToday();
@@ -679,7 +680,7 @@ for (const box of document.querySelectorAll(".uploader")){
   };
 }
 $("tabToday").onclick = () => show("today");
-$("tabSetup").onclick = () => show("setup");
+$("tabSetup").onclick = () => show(me.rol === "familie" ? "family" : "setup");
 for (const b of document.querySelectorAll(".logout")) b.onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 /* ---------- Inloggen ---------- */
@@ -711,7 +712,8 @@ async function boot(){
   }
   me = rij;
   canSetup = me.rol === "beheer";
-  $("tabs").hidden = !canSetup;
+  $("tabs").hidden = !(canSetup || me.rol === "familie");
+  $("tabSetup").textContent = me.rol === "familie" ? "Filmpje sturen" : "Instellen";
   show(me.rol === "familie" ? "family" : "today");
   await loadAll();
 }
