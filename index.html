@@ -79,14 +79,15 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .hday{cursor:pointer}
 .clue{font-size:19px!important;color:var(--ink)!important;font-style:italic}
 .clue span{font-style:normal;color:var(--muted)}
-.vpic{position:relative;border-radius:10px;overflow:hidden;cursor:crosshair;touch-action:manipulation}
-.vpic canvas{display:block;width:100%;height:auto}
-.vmark{position:absolute;border:3px solid var(--sun);border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none}
-.vmark.hint{border-color:#fff;border-style:dashed;animation:knipper .5s ease-in-out 5 alternate}
-.vpic.mis{animation:schud .3s}
-@keyframes knipper{from{opacity:.2}to{opacity:1}}
-@keyframes schud{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-@media (prefers-reduced-motion:reduce){.vmark.hint,.vpic.mis{animation:none}}
+.vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+label.link{color:var(--brand);text-decoration:underline;cursor:pointer;align-self:flex-start}
+label.big{display:inline-flex;justify-content:center;align-items:center;cursor:pointer;border-radius:12px;background:var(--brand);color:var(--brand-ink);font-weight:700}
+.opdracht{font:600 22px/1.3 var(--display)!important;color:var(--ink)!important}
+.fotoklaar{width:100%;border-radius:12px}
+.album{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.album button{display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:none;color:var(--ink);font-weight:400;text-align:left}
+.album img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--glass)}
+.album small{color:var(--muted);font-size:14px;line-height:1.3}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -236,6 +237,11 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
       <div class="weeks" id="histWeeks"></div>
       <div id="histDays"></div>
     </div>
+
+    <div class="card" id="albumCard" hidden>
+      <h2>Papa's fotoalbum</h2>
+      <div class="album" id="album"></div>
+    </div>
   </section>
 
   <section id="viewSetup" class="view" hidden>
@@ -261,7 +267,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
         <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
         <div class="row">
           <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
-          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Woord van de dag</option><option value="verschillen">Zoek de verschillen</option></select></label>
+          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Woord van de dag</option><option value="foto">Foto-opdracht</option></select></label>
           <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
@@ -274,6 +280,14 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
       <label>De woorden<textarea id="setPuzzel" rows="10"></textarea></label>
       <p class="note" id="woordStand"></p>
       <button class="primary" id="savePuzzel">Woorden opslaan</button>
+    </div>
+
+    <div class="card">
+      <h2>Foto-opdrachten</h2>
+      <p>Zet in het plan een onderdeel met soort <b>Foto-opdracht</b>. Elke dag krijgt hij de volgende opdracht: "Maak een foto van …". Eén opdracht per regel.</p>
+      <label>De opdrachten<textarea id="setOpdrachten" rows="10"></textarea></label>
+      <p class="note" id="opdrachtStand"></p>
+      <button class="primary" id="saveOpdrachten">Opdrachten opslaan</button>
     </div>
 
     <div class="card">
@@ -339,8 +353,7 @@ const VOOR = {
   altijd:   "Altijd",
   oefening: "Bij oefeningen",
   wandelen: "Bij wandelen",
-  puzzel:   "Bij de puzzel",
-  verschillen: "Alleen als foto voor zoek de verschillen",
+  puzzel:   "Bij de puzzel of foto-opdracht",
   water:    "Als de waterfles vol is",
   klaar:    "Als alles af is",
   ochtend:  "Goedemorgen (eerste keer openen op een dag)",
@@ -364,7 +377,7 @@ function pickMedia(cat){
   const tiers = [v => v.voor === cat && v.week === w, v => v.voor === cat];
   // Speciale momenten krijgen nooit een willekeurig ander bericht, en worden zelf nooit als reserve gebruikt.
   const SPECIAAL = ["ochtend", "operatiedag"];
-  if (!SPECIAAL.includes(cat)) tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => ![...SPECIAAL, "overleefd", "verschillen"].includes(v.voor));
+  if (!SPECIAAL.includes(cat)) tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => ![...SPECIAAL, "overleefd"].includes(v.voor));
   for (const tier of tiers){
     const pool = videos.filter(v => ok(v) && tier(v));
     if (pool.length) return pool[Math.floor(Math.random()*pool.length)];
@@ -419,6 +432,11 @@ async function loadAll(){
   weken = {}; for (const r of w.data) weken[r.week] = r.oefeningen || [];
   recent = l.data.map(r => ({...r.data, datum: r.datum}));
   log = recent.find(r => r.datum === day) || {};
+  const opdrachtFotos = recent.map(r => r.foto).filter(Boolean);
+  if (opdrachtFotos.length){
+    const {data} = await sb.storage.from("filmpjes").createSignedUrls(opdrachtFotos, 86400);
+    for (const d of data || []) if (d.signedUrl) fotoUrls[d.path] = d.signedUrl;
+  }
   // Filmpjes staan privé; tijdelijke links vooraf maken zodat ze direct kunnen spelen.
   videos = f.data;
   const paden = videos.filter(v => v.pad).map(v => v.pad);
@@ -582,7 +600,7 @@ function renderToday(){
   for (const t of list){
     const c = Math.min(log[t.id]||0, t.keer); done += c;
     if (catOf(t) === "puzzel"){ el.appendChild(renderPuzzle(t)); continue; }
-    if (catOf(t) === "verschillen"){ el.appendChild(renderVerschillen(t)); continue; }
+    if (catOf(t) === "foto"){ el.appendChild(renderFotoOpdracht(t)); continue; }
     const card = document.createElement("div");
     card.className = "card task" + (c>=t.keer ? " alldone" : "");
     card.innerHTML = `<h3>${esc(t.naam)}</h3>${t.uitleg?`<p>${esc(t.uitleg)}</p>`:""}<div class="dots"></div>`;
@@ -601,6 +619,7 @@ function renderToday(){
   renderWeek();
   renderMood();
   renderSurvived();
+  renderAlbum();
   renderHistory();
 }
 
@@ -648,96 +667,43 @@ function renderHistory(){
   $("histDays").onclick = e => { const r = e.target.closest(".hday"); if (r) goDay(r.dataset.d); };
 }
 
-/* ---------- Zoek de verschillen: eigen foto + kopie met 7 kleine verschillen ---------- */
-const VERSCHILLEN = 7, VHINTS = 3;
-const vFotos = () => { const eigen = videos.filter(v => v.soort === "foto" && v.voor === "verschillen"); return eigen.length ? eigen : videos.filter(v => v.soort === "foto"); };
-const vNr = () => recent.filter(r => r.datum < day && r.verschilKlaar).length;
-const vCache = {};
-function seeded(str){
-  let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 2**32; };
-}
-// Maakt de twee plaatjes één keer per foto. Alleen tekenen met clip + mengmodus: werkt ook op oudere iPhones.
-function maakVerschillen(foto, klaar){
-  const key = foto.id;
-  if (vCache[key]) return vCache[key].ready ? vCache[key] : null;
-  const c = vCache[key] = {ready: false};
-  const img = new Image();
-  img.onload = () => {
-    const sc = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
-    const W = Math.round(img.naturalWidth*sc), H = Math.round(img.naturalHeight*sc);
-    const mk = () => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; return cv; };
-    const A = mk(), B = mk();
-    A.getContext("2d").drawImage(img, 0, 0, W, H);
-    const ctx = B.getContext("2d"); ctx.drawImage(A, 0, 0);
-    const rnd = seeded(foto.id), m = Math.min(W, H), diffs = [];
-    const soorten = ["kleur", "spiegel", "kloon", "licht", "draai", "donker", "kleur"];
-    for (let k = 0, tries = 0; k < VERSCHILLEN && tries < 500; tries++){
-      const r = m * (0.035 + rnd()*0.02), x = r + rnd()*(W-2*r), y = r + rnd()*(H-2*r);
-      if (diffs.some(d => Math.hypot(d.x-x, d.y-y) < (d.r+r)*1.6)) continue;
-      const soort = soorten[k];
-      ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 2*Math.PI); ctx.clip();
-      if (soort === "kleur"){ ctx.globalCompositeOperation = "hue"; ctx.fillStyle = `hsl(${Math.floor(rnd()*360)},80%,50%)`; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
-      else if (soort === "licht"){ ctx.globalCompositeOperation = "screen"; ctx.fillStyle = "rgba(255,255,255,.32)"; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
-      else if (soort === "donker"){ ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = "rgb(150,150,150)"; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
-      else if (soort === "spiegel"){ ctx.translate(2*x, 0); ctx.scale(-1, 1); ctx.drawImage(A, 0, 0); }
-      else if (soort === "draai"){ ctx.translate(x, y); ctx.rotate(Math.PI); ctx.translate(-x, -y); ctx.drawImage(A, 0, 0); }
-      else { const dx = (rnd() < .5 ? -1 : 1) * r * (2.5 + rnd()*2), dy = (rnd() - .5) * r * 3; ctx.drawImage(A, dx, dy); }
-      ctx.restore();
-      diffs.push({x, y, r}); k++;
-    }
-    Object.assign(c, {ready: true, A, B, W, H, diffs});
-    klaar();
-  };
-  img.onerror = () => { c.fout = true; klaar(); };
-  img.src = foto.url;
-  return null;
-}
-function renderVerschillen(t){
+/* ---------- Foto-opdracht: elke dag "maak een foto van ..." ---------- */
+const OPDRACHTEN = "iets groens\nje ontbijt\nhet uitzicht uit je raam\niets waar je om moet glimlachen\nje favoriete mok\nje sloffen\niets ronds\nwat je nu aan het lezen bent\nde lucht van vandaag\niets ouds in huis met een verhaal\nje duim omhoog\niets roods\nde plek waar je het liefst zit\neen selfie met je beste glimlach";
+const opdrachten = () => (settings.opdrachten || OPDRACHTEN).split(/\n+/).map(x => x.trim()).filter(Boolean);
+const opdrachtNr = () => recent.filter(r => r.datum < day && r.foto).length;
+const opdrachtVanDaag = () => { const o = opdrachten(); return o[opdrachtNr() % o.length]; };
+let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
+function renderFotoOpdracht(t){
   const card = document.createElement("div");
-  const fotos = vFotos(), gevonden = log.verschil || [], klaar = !!log.verschilKlaar;
+  const klaar = !!log.foto, opdracht = log.opdracht || opdrachtVanDaag();
   card.className = "card task" + (klaar ? " alldone" : "");
-  card.innerHTML = `<h3>${esc(t.naam)}</h3>`;
-  if (!fotos.length){ card.insertAdjacentHTML("beforeend", `<p>Nog geen foto's. Zet foto's klaar bij Instellen → Beloningen (kies het moment "Alleen als foto voor zoek de verschillen").</p>`); return card; }
-  const foto = fotos[vNr() % fotos.length], v = maakVerschillen(foto, () => renderToday());
-  if (!v){ card.insertAdjacentHTML("beforeend", `<p>${vCache[foto.id]?.fout ? "Deze foto kon niet geladen worden." : "Foto laden…"}</p>`); return card; }
-  card.insertAdjacentHTML("beforeend", `<p>${t.uitleg ? esc(t.uitleg) : `Er zijn ${VERSCHILLEN} verschillen tussen de twee foto's. Tik ze aan, op welke foto je wilt.`}</p>`);
-  for (const cv of [v.A, v.B]){
-    const box = document.createElement("div"); box.className = "vpic";
-    box.appendChild(cv);
-    v.diffs.forEach((d, i) => {
-      if (!gevonden.includes(i) && !(klaar)) return;
-      box.insertAdjacentHTML("beforeend", `<span class="vmark" style="left:${(d.x-d.r*1.3)/v.W*100}%;top:${(d.y-d.r*1.3)/v.H*100}%;width:${d.r*2.6/v.W*100}%;height:${d.r*2.6/v.H*100}%"></span>`);
-    });
-    if (!klaar) box.onclick = e => {
-      const b = cv.getBoundingClientRect(), x = (e.clientX-b.left)/b.width*v.W, y = (e.clientY-b.top)/b.height*v.H;
-      const i = v.diffs.findIndex((d, i) => !gevonden.includes(i) && Math.hypot(d.x-x, d.y-y) <= d.r*1.5);
-      if (i < 0){ box.classList.remove("mis"); void box.offsetWidth; box.classList.add("mis"); return; }
-      const verschil = [...gevonden, i];
-      if (verschil.length >= v.diffs.length) save({verschil, verschilKlaar: true, [t.id]: 1}, {cat: "puzzel", title: "Alles gevonden!", text: "Scherp gezien. Morgen een nieuwe foto."});
-      else { log = {...log, verschil}; renderToday(); saveLog(log); }
-    };
-    card.appendChild(box);
-  }
-  const over = VHINTS - (log.vhints || 0);
-  const row = document.createElement("div"); row.className = "row";
-  row.insertAdjacentHTML("beforeend", `<span class="note">${klaar ? "Alles gevonden!" : `${gevonden.length} van ${v.diffs.length} gevonden`}</span>`);
-  if (!klaar){
-    const hint = document.createElement("button"); hint.textContent = `Hint (${over} over)`; hint.disabled = over <= 0;
-    hint.onclick = () => {
-      const open = v.diffs.map((d, i) => i).filter(i => !gevonden.includes(i));
-      const d = v.diffs[open[Math.floor(Math.random()*open.length)]];
-      log = {...log, vhints: (log.vhints || 0) + 1}; saveLog(log); renderToday();
-      // Even laten oplichten waar het zit; hij moet het daarna zelf aantikken.
-      for (const box of card.ownerDocument.querySelectorAll(".vpic")){
-        box.insertAdjacentHTML("beforeend", `<span class="vmark hint" style="left:${(d.x-d.r*2.5)/v.W*100}%;top:${(d.y-d.r*2.5)/v.H*100}%;width:${d.r*5/v.W*100}%;height:${d.r*5/v.H*100}%"></span>`);
-      }
-      setTimeout(() => document.querySelectorAll(".vmark.hint").forEach(el => el.remove()), 2500);
-    };
-    row.prepend(hint);
-  }
-  card.appendChild(row);
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Maak een foto van</p><p class="opdracht">${esc(opdracht)}</p>`;
+  if (klaar && fotoUrls[log.foto]) card.insertAdjacentHTML("beforeend", `<img class="fotoklaar" src="${fotoUrls[log.foto]}" alt="${esc(opdracht)}">`);
+  if (me.rol === "familie" && !klaar){ card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
+  const lab = document.createElement("label");
+  lab.className = klaar ? "link" : "big";
+  lab.innerHTML = `${klaar ? "Andere foto maken" : "Maak de foto"}<input type="file" accept="image/*" capture="environment" class="vh">`;
+  if (!klaar) lab.style.cssText = "font-size:22px;padding:16px 22px;width:100%";
+  const inp = lab.querySelector("input"), msg = document.createElement("p"); msg.className = "note";
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    msg.textContent = "Foto versturen…";
+    const blob = await verkleinFoto(f), pad = `papa/${day}-${crypto.randomUUID().slice(0,8)}.jpg`;
+    const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: blob.type || "image/jpeg"});
+    if (up.error){ msg.textContent = `Versturen lukte niet (${up.error.message}).`; return; }
+    fotoUrls[pad] = URL.createObjectURL(blob);
+    const eerste = !log.foto;
+    save({foto: pad, opdracht, [t.id]: 1}, eerste ? {cat: "puzzel", title: "Mooie foto!", text: "De familie kan hem nu zien."} : null);
+  };
+  card.append(lab, msg);
   return card;
+}
+// Papa's fotoalbum: alle opdrachtfoto's, nieuwste eerst.
+function renderAlbum(){
+  const fotos = recent.filter(r => r.foto && fotoUrls[r.foto]).sort((a, b) => a.datum < b.datum ? 1 : -1);
+  $("albumCard").hidden = !fotos.length;
+  $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}</small></button>`).join("");
+  $("album").onclick = e => { const b = e.target.closest("button[data-pad]"); if (b) showMedia(b.dataset.titel, {soort: "foto", url: fotoUrls[b.dataset.pad]}); };
 }
 
 /* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
@@ -908,6 +874,8 @@ function renderSetup(){
   $("setOp").value ||= settings.operatie || "";
   $("setWater").value ||= settings.water || "";
   $("setPuzzel").value ||= settings.puzzel || WOORDEN;
+  $("setOpdrachten").value ||= settings.opdrachten || OPDRACHTEN;
+  { const o = opdrachten(), i = opdrachtNr(); $("opdrachtStand").textContent = `${o.length} opdrachten. Hij is bij opdracht ${i % o.length + 1}: ${o[i % o.length] || "-"}${i >= o.length ? " (de lijst begint opnieuw)" : ""}.`; }
   { const ws = woordenlijst(), i = woordNr(); $("woordStand").textContent = `${ws.length} woorden. Hij is bij woord ${i % ws.length + 1}: ${ws[i % ws.length] || "-"}${i >= ws.length ? " (de lijst begint opnieuw, zet er meer woorden bij)" : ""}.`; }
   if (setupWeek == null) setupWeek = weekOf(day);
 
@@ -1002,7 +970,7 @@ $("fCancel").onclick = resetForm;
 $("taskForm").addEventListener("submit", async e => {
   e.preventDefault();
   const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)), soort:$("fSoort").value };
-  if (t.soort === "puzzel" || t.soort === "verschillen") t.keer = 1; // één per dag
+  if (t.soort === "puzzel" || t.soort === "foto") t.keer = 1; // één per dag
   if (!t.naam) return;
   // Nog geen eigen plan? Begin met een kopie van de week ervoor.
   const from = planWeek(setupWeek);
@@ -1010,6 +978,12 @@ $("taskForm").addEventListener("submit", async e => {
   await writeWeek(setupWeek, editing ? base.map(x => x.id===editing ? t : x) : [...base, t]);
   resetForm();
 });
+$("saveOpdrachten").onclick = async () => {
+  const tekst = $("setOpdrachten").value.trim();
+  const {error} = await sb.from("instellingen").update({ opdrachten: tekst === OPDRACHTEN ? null : tekst || null }).eq("id", 1);
+  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
+  toast("Opdrachten opgeslagen"); await loadAll();
+};
 $("savePuzzel").onclick = async () => {
   const tekst = $("setPuzzel").value.trim();
   const {error} = await sb.from("instellingen").update({ puzzel: tekst === WOORDEN ? null : tekst || null }).eq("id", 1);
