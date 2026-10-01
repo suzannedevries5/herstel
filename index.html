@@ -58,6 +58,19 @@ button.link.danger{color:var(--danger)}
 .moods button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;font-weight:400;font-size:15px;border-color:var(--line);color:var(--ink)}
 .moods button span{font-size:34px;line-height:1}
 .moods button.on{border-color:var(--brand);background:var(--glass);font-weight:700}
+.cipher{display:flex;flex-wrap:wrap;gap:12px 16px;padding-block:4px}
+.word{display:inline-flex;gap:3px}
+.cell{width:34px;padding:2px 0 0;border:0;border-bottom:3px solid var(--brand);border-radius:6px 6px 2px 2px;background:var(--glass);display:flex;flex-direction:column;align-items:center;color:var(--ink);font-weight:700}
+.cell b{font-size:21px;height:26px;line-height:26px}
+.cell small{font-size:12px;font-weight:400;color:var(--muted)}
+.cell.same{background:var(--sun);color:#15262B}
+.cell.same small{color:#15262B}
+.punct{align-self:flex-start;font-size:21px;line-height:26px}
+.kbd{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.kbd button{padding:10px 0;font-size:19px}
+.kbd button.used{opacity:.45}
+.kbd button.wide{grid-column:span 2;font-size:16px}
+.solved{font-size:19px;line-height:1.6;color:var(--ink)!important;white-space:pre-wrap}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -222,11 +235,18 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
         <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
         <div class="row">
           <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
-          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option></select></label>
+          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Dagpuzzel</option></select></label>
           <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
       </form>
+    </div>
+
+    <div class="card">
+      <h2>Dagpuzzel</h2>
+      <p>Zet in het plan een onderdeel met soort <b>Dagpuzzel</b>. Elke dag krijgt hij het volgende stukje van dit verhaal in geheimschrift. Een lege regel tussen twee stukjes = een nieuwe dag. Pas je het verhaal aan, dan begint de code opnieuw.</p>
+      <label>Het verhaal<textarea id="setPuzzel" rows="10"></textarea></label>
+      <button class="primary" id="savePuzzel">Verhaal opslaan</button>
     </div>
 
     <div class="card">
@@ -292,6 +312,7 @@ const VOOR = {
   altijd:   "Altijd",
   oefening: "Bij oefeningen",
   wandelen: "Bij wandelen",
+  puzzel:   "Bij de puzzel",
   water:    "Als de waterfles vol is",
   klaar:    "Als alles af is",
   ochtend:  "Goedemorgen (eerste keer openen op een dag)",
@@ -490,6 +511,7 @@ function renderToday(){
   let done = Math.min(log.water||0, goal)/GLAS;
   for (const t of list){
     const c = Math.min(log[t.id]||0, t.keer); done += c;
+    if (catOf(t) === "puzzel"){ el.appendChild(renderPuzzle(t)); continue; }
     const card = document.createElement("div");
     card.className = "card task" + (c>=t.keer ? " alldone" : "");
     card.innerHTML = `<h3>${esc(t.naam)}</h3>${t.uitleg?`<p>${esc(t.uitleg)}</p>`:""}<div class="dots"></div>`;
@@ -551,6 +573,135 @@ function renderHistory(){
     const g = GEVOEL[l.gevoel];
     return `<div class="hday"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
   }).join("") || '<p class="note">Nog niets om terug te kijken.</p>';
+}
+
+/* ---------- Dagpuzzel: geheimschrift, elk getal is een letter ---------- */
+const VERHAAL = `Op een regenachtige maandag vond inspecteur Van Dam een briefje onder zijn deur. Er stond maar een zin op: zoek de man met de rode hoed.
+
+Niemand in het dorp droeg een rode hoed. Behalve de bakker, maar die lag al drie dagen met griep in bed. Of toch niet?
+
+Van Dam fietste naar de bakkerij. De deur stond open en het rook naar verse krentenbollen. Op de toonbank lag een tweede briefje.
+
+Het tweede briefje zei: tel de klokken in de kerktoren en ga naar het huis met hetzelfde nummer. Van Dam telde er zeven.
+
+Op nummer zeven woonde mevrouw Jansen met haar drie katten. Ze schonk thee en zei: ik weet niks, maar mijn kat Pietje weet alles.
+
+Pietje sprong op de vensterbank en keek naar de molen aan de overkant. Daar draaide iets dat geen wiek was. Het was een rode hoed.
+
+In de molen lag een oude kaart van het dorp. Met potlood was een kruisje gezet bij de vijver achter het gemeentehuis.
+
+Bij de vijver zat een visser die al veertig jaar niets had gevangen. Vandaag wel, zei hij trots, en hij liet een fles met een brief zien.
+
+De brief in de fles was geschreven in geheimschrift. Gelukkig had Van Dam op de politieschool altijd een tien gehaald voor puzzelen.
+
+De boodschap luidde: het geheim ligt waar de burgemeester elke ochtend zijn koffie drinkt. Dat was natuurlijk café De Gouden Leeuw.
+
+In het café was het stil. De barman poetste glazen en knipoogde. Onder het bierviltje van tafel vier zat een klein sleuteltje.
+
+Het sleuteltje paste op een kluisje van het zwembad. Daarin lag een rode hoed en een foto van iedereen uit het dorp.
+
+Op de achterkant van de foto stond: voor de inspecteur, omdat hij altijd iedereen helpt. Kom zaterdag om drie uur naar het dorpsplein.
+
+Op zaterdag stond het hele dorp klaar met taart en slingers. Het was een verrassingsfeest voor Van Dam. Zaak opgelost, goed gedaan!`;
+const HINTS_PER_DAG = 3, ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+const delen = () => (settings.puzzel || VERHAAL).split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+// Vaste code per verhaal: dezelfde tekst geeft altijd dezelfde getallen.
+function puzzelSleutel(){
+  let h = 2166136261; for (const ch of settings.puzzel || VERHAAL) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 2**32; };
+  const nums = Array.from({length: 26}, (_,i) => i+1);
+  for (let i = 25; i > 0; i--){ const j = Math.floor(rnd()*(i+1)); [nums[i], nums[j]] = [nums[j], nums[i]]; }
+  return Object.fromEntries([...ABC].map((L,i) => [L, nums[i]]));
+}
+// Welk stukje vandaag: het aantal eerder opgeloste dagen (een dag overslaan = gewoon verder waar hij was).
+const puzzelDeel = () => recent.filter(r => r.datum < day && r.puzzel).length;
+// Zijn ingevulde letters {getal: letter}; op een nieuwe dag gaat hij verder met de laatste stand.
+function puzzelCode(){
+  if (log.code) return {...log.code};
+  const prev = recent.filter(r => r.datum < day && r.code).sort((a,b) => a.datum < b.datum ? 1 : -1)[0];
+  return {...(prev?.code || {})};
+}
+let puzSel = null; // het getal dat hij nu aan het invullen is
+function renderPuzzle(t){
+  const parts = delen(), i = puzzelDeel(), key = puzzelSleutel(), code = puzzelCode();
+  const card = document.createElement("div");
+  card.className = "card task" + (log.puzzel ? " alldone" : "");
+  if (i >= parts.length && !log.puzzel){
+    card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Het hele verhaal is opgelost! Knap gedaan.</p>`;
+    return card;
+  }
+  const deel = i; // vandaag opgelost telt pas morgen mee in puzzelDeel
+  const tekst = parts[deel];
+  card.innerHTML = `<h3>${esc(t.naam)} · deel ${deel+1} van ${parts.length}</h3>`;
+  if (log.puzzel){
+    card.insertAdjacentHTML("beforeend", `<p class="solved">${esc(tekst)}</p><p>Opgelost! Morgen het volgende stukje.</p>`);
+    return card;
+  }
+  card.insertAdjacentHTML("beforeend", `<p>${t.uitleg ? esc(t.uitleg) : "Elk getal is een letter. Tik op een vakje en kies de letter. Hetzelfde getal is overal dezelfde letter."}</p>`);
+  const box = document.createElement("div"); box.className = "cipher";
+  for (const woord of norm(tekst).split(/\s+/)){
+    const w = document.createElement("span"); w.className = "word";
+    for (const ch of woord){
+      if (!ABC.includes(ch)){ w.insertAdjacentHTML("beforeend", `<span class="punct">${esc(ch)}</span>`); continue; }
+      const n = key[ch], b = document.createElement("button");
+      b.className = "cell" + (n === puzSel ? " same" : "");
+      b.innerHTML = `<b>${code[n] || ""}</b><small>${n}</small>`;
+      b.setAttribute("aria-label", `Getal ${n}${code[n] ? ", ingevuld: " + code[n] : ""}`);
+      b.onclick = () => { puzSel = puzSel === n ? null : n; renderToday(); };
+      w.appendChild(b);
+    }
+    box.appendChild(w);
+  }
+  card.appendChild(box);
+
+  if (puzSel != null){
+    const kbd = document.createElement("div"); kbd.className = "kbd";
+    const used = new Set(Object.values(code));
+    for (const L of ABC){
+      const b = document.createElement("button"); b.textContent = L;
+      if (used.has(L) && code[puzSel] !== L) b.className = "used";
+      b.onclick = () => setLetter(t, puzSel, L);
+      kbd.appendChild(b);
+    }
+    const wis = document.createElement("button"); wis.textContent = "Wissen"; wis.className = "wide";
+    wis.onclick = () => setLetter(t, puzSel, null);
+    kbd.appendChild(wis);
+    card.appendChild(kbd);
+  }
+
+  const letters = new Set([...norm(tekst)].filter(ch => ABC.includes(ch)));
+  const open = [...letters].filter(L => code[key[L]] !== L);
+  const leeg = [...letters].filter(L => !code[key[L]]).length;
+  const hintsOver = HINTS_PER_DAG - (log.hints || 0);
+  const row = document.createElement("div"); row.className = "row";
+  const hint = document.createElement("button");
+  hint.textContent = `Hint (${hintsOver} over)`; hint.disabled = hintsOver <= 0;
+  hint.onclick = () => {
+    // De letter die het vaakst voorkomt en nog niet goed staat.
+    const tel = L => [...norm(tekst)].filter(ch => ch === L).length;
+    const L = open.sort((a,b) => tel(b) - tel(a))[0];
+    if (L) setLetter(t, key[L], L, true);
+  };
+  row.appendChild(hint);
+  row.insertAdjacentHTML("beforeend", `<span class="note">${leeg ? `Nog ${leeg} ${leeg===1?"getal":"getallen"} open` : "Alles ingevuld, maar er zit nog een foutje in."}</span>`);
+  card.appendChild(row);
+  return card;
+}
+function setLetter(t, n, L, isHint = false){
+  const code = puzzelCode();
+  for (const k in code) if (code[k] === L) delete code[k]; // een letter hoort maar bij één getal
+  if (L) code[n] = L; else delete code[n];
+  const key = puzzelSleutel(), tekst = delen()[puzzelDeel()];
+  const opgelost = [...norm(tekst)].filter(ch => ABC.includes(ch)).every(ch => code[key[ch]] === ch);
+  const patch = {code, ...(isHint ? {hints: (log.hints || 0) + 1} : {})};
+  if (opgelost){
+    puzSel = null;
+    save({...patch, puzzel: true, [t.id]: 1}, {cat: "puzzel", title: "Opgelost!", text: "Morgen het volgende stukje van het verhaal."});
+  } else {
+    if (isHint) puzSel = null;
+    log = {...log, ...patch}; renderToday(); saveLog(log);
+  }
 }
 
 // reward = {cat, title?, text?} of null. De beloning start meteen, nog binnen de tik:
@@ -647,6 +798,7 @@ function renderSetup(){
   $("setName").value ||= settings.naam || "";
   $("setOp").value ||= settings.operatie || "";
   $("setWater").value ||= settings.water || "";
+  $("setPuzzel").value ||= settings.puzzel || VERHAAL;
   if (setupWeek == null) setupWeek = weekOf(day);
 
   $("weeks").innerHTML = "";
@@ -740,6 +892,7 @@ $("fCancel").onclick = resetForm;
 $("taskForm").addEventListener("submit", async e => {
   e.preventDefault();
   const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)), soort:$("fSoort").value };
+  if (t.soort === "puzzel") t.keer = 1; // één stukje per dag
   if (!t.naam) return;
   // Nog geen eigen plan? Begin met een kopie van de week ervoor.
   const from = planWeek(setupWeek);
@@ -747,6 +900,12 @@ $("taskForm").addEventListener("submit", async e => {
   await writeWeek(setupWeek, editing ? base.map(x => x.id===editing ? t : x) : [...base, t]);
   resetForm();
 });
+$("savePuzzel").onclick = async () => {
+  const tekst = $("setPuzzel").value.trim();
+  const {error} = await sb.from("instellingen").update({ puzzel: tekst === VERHAAL ? null : tekst || null }).eq("id", 1);
+  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
+  toast("Verhaal opgeslagen"); await loadAll();
+};
 $("saveSettings").onclick = async () => {
   const water = +$("setWater").value;
   const {error} = await sb.from("instellingen").upsert({ id:1, naam:$("setName").value.trim(), operatie:$("setOp").value || null, water: water>=0.5 ? water : 2 });
