@@ -90,7 +90,11 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 #reward{position:fixed;inset:0;background:rgba(10,20,22,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px 16px;z-index:10;text-align:center;color:#fff}
 #reward h2{font-size:clamp(30px,8vw,48px);color:var(--sun)}
 #reward p{margin:0;font-size:20px}
-#reward video{max-width:100%;max-height:60vh;border-radius:16px;background:#000}
+#reward video,#reward img{max-width:100%;max-height:60vh;border-radius:16px;background:#000}
+#reward audio{width:min(100%,420px)}
+.uploader .row{align-items:center}
+.rec.on{background:var(--danger);border-color:var(--danger);color:#fff}
+.item select{width:auto;padding:4px 8px;font-size:15px}
 #reward button{background:var(--sun);border-color:var(--sun);color:#15262B;font-size:20px;padding:12px 28px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;z-index:9;max-width:calc(100% - 32px);text-align:center}
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:11}
@@ -195,6 +199,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
         <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
         <div class="row">
           <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
+          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option></select></label>
           <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
@@ -202,15 +207,15 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     </div>
 
     <div class="card">
-      <h2>Filmpjes als beloning</h2>
-      <p>Na elk vinkje speelt een willekeurig filmpje. Filmpjes van je iPhone kunnen gewoon, tot 3 minuten. Ze worden eerst verkleind tot 720p.</p>
-      <div class="uploader"><input type="file" class="upload" accept="video/*" multiple><button class="primary send" hidden>Versturen</button><p class="note uploadMsg"></p></div>
+      <h2>Beloningen</h2>
+      <p>Filmpjes, foto's en spraakberichten. Kies bij elk bericht bij welk moment het hoort. Zonder passend bericht pakt de app er een van "Altijd".</p>
+      <div class="uploader"></div>
       <div id="videos"></div>
     </div>
 
     <div class="card">
       <h2>Wie mag erin?</h2>
-      <p><b>Afvinken</b>: ziet alleen het plan van vandaag. <b>Filmpjes sturen</b>: kan alleen filmpjes uploaden. Ze openen de link, tikken op <b>Account maken</b> en kiezen zelf een wachtwoord, met precies het e-mailadres dat je hier invult.</p>
+      <p><b>Afvinken</b>: ziet alleen het plan van vandaag. <b>Berichtjes sturen</b>: kan filmpjes, foto's en spraakberichten sturen, en meekijken en afvinken bij Vandaag. Ze openen de link, tikken op <b>Account maken</b> en kiezen zelf een wachtwoord, met precies het e-mailadres dat je hier invult.</p>
       <div id="people"></div>
       <form id="personForm">
         <div class="row">
@@ -218,7 +223,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
           <label>E-mailadres<input id="pEmail" type="email" required></label>
         </div>
         <div class="row">
-          <label>Mag<select id="pRol"><option value="familie">Filmpjes sturen</option><option value="deelnemer">Afvinken (papa)</option></select></label>
+          <label>Mag<select id="pRol"><option value="familie">Berichtjes sturen (en meekijken)</option><option value="deelnemer">Afvinken (papa)</option></select></label>
           <button class="primary" type="submit">Toevoegen</button>
         </div>
       </form>
@@ -229,9 +234,9 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
   <section id="viewFamily" class="view" hidden>
     <div class="card">
-      <h2>Stuur een filmpje</h2>
-      <p id="familyIntro">Elke keer dat hij een oefening afvinkt, krijgt hij een willekeurig filmpje te zien. Een kort berichtje van jou maakt zijn dag. Filmpjes van je iPhone kunnen gewoon, tot 3 minuten. Ze worden eerst verkleind, dat duurt net zo lang als het filmpje zelf.</p>
-      <div class="uploader"><input type="file" class="upload" accept="video/*" multiple><button class="primary send" hidden>Versturen</button><p class="note uploadMsg"></p></div>
+      <h2>Stuur een berichtje</h2>
+      <p id="familyIntro">Als hij iets afvinkt, krijgt hij een berichtje te zien of te horen: een filmpje, foto of spraakbericht. Kies bij welk moment het hoort. Filmpjes tot 3 minuten worden eerst verkleind, dat duurt net zo lang als het filmpje zelf.</p>
+      <div class="uploader"></div>
       <p class="note" id="familyCount"></p>
     </div>
     <button class="link logout">Uitloggen</button>
@@ -242,6 +247,8 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   <h2 id="rewardTitle">Goed gedaan!</h2>
   <p id="rewardText"></p>
   <video id="rewardVideo" playsinline controls hidden></video>
+  <img id="rewardImg" alt="" hidden>
+  <audio id="rewardAudio" controls hidden></audio>
   <button id="rewardClose">Verder</button>
 </div>
 <div id="toast" hidden></div>
@@ -255,6 +262,24 @@ const addDays = (s, n) => { const d = new Date(s+"T12:00"); d.setDate(d.getDate(
 const diffDays = (a, b) => Math.round((new Date(a+"T12:00") - new Date(b+"T12:00"))/864e5);
 const MAXWEEK = 16, GLAS = 250;
 const cheers = ["Top gedaan!", "Weer een stap vooruit!", "Kanjer!", "Zo kom je er wel!", "Lekker bezig!"];
+// Bij welk moment een beloning hoort. "altijd" is de reserve voor elk moment behalve goedemorgen.
+const VOOR = {
+  altijd:   "Altijd",
+  oefening: "Bij oefeningen",
+  wandelen: "Bij wandelen",
+  water:    "Als de waterfles vol is",
+  klaar:    "Als alles af is",
+  ochtend:  "Goedemorgen (eerste keer openen op een dag)",
+};
+const SOORT = {video:"Filmpje", foto:"Foto", audio:"Spraakbericht"};
+const voorOptions = sel => Object.entries(VOOR).map(([k,v]) => `<option value="${k}"${k===sel?" selected":""}>${v}</option>`).join("");
+const catOf = t => t.soort || (/wandel/i.test(t.naam) ? "wandelen" : "oefening");
+function pickMedia(cat){
+  let pool = videos.filter(v => v.voor === cat);
+  if (!pool.length && cat !== "ochtend") pool = videos.filter(v => v.voor === "altijd");
+  if (!pool.length && cat !== "ochtend") pool = videos.filter(v => v.voor !== "ochtend");
+  return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+}
 
 let canSetup = false, ready = false, me = {}, people = [];
 let weken = {}, videos = [], settings = {}, log = {}, recent = [], day = iso(new Date());
@@ -304,8 +329,15 @@ async function loadAll(){
   ready = true;
   renderHeader(); renderToday(); if (!$("viewSetup").hidden) renderSetup();
   const mine = videos.filter(v => v.van === me.naam).length;
-  $("familyCount").textContent = videos.length ? `Er staan ${videos.length} filmpjes klaar${mine ? `, waarvan ${mine} van jou` : ""}.` : "Er staan nog geen filmpjes klaar. Jij mag de eerste zijn!";
+  $("familyCount").textContent = videos.length ? `Er staan ${videos.length} berichtjes klaar${mine ? `, waarvan ${mine} van jou` : ""}.` : "Er staan nog geen berichtjes klaar. Jij mag de eerste zijn!";
   syncSteps();
+  greet();
+}
+// Eerste keer openen op een dag: een goedemorgen-bericht, alleen voor papa en alleen als er een is.
+async function greet(){
+  if (me.rol !== "deelnemer" || log.begroet || !videos.some(v => v.voor === "ochtend")) return;
+  log = {...log, begroet: true};
+  if (await saveLog(log)) showReward("Goedemorgen!", "", "ochtend", false);
 }
 async function saveLog(next){
   const {error} = await sb.from("log").upsert({datum: day, data: next});
@@ -423,7 +455,7 @@ function renderToday(){
       b.className = "dot" + (i<c?" on":"");
       b.textContent = i<c ? "✓" : String(i+1);
       b.setAttribute("aria-label", `${t.naam}, keer ${i+1} ${i<c?"gedaan, tik om terug te zetten":"afvinken"}`);
-      b.onclick = () => save({[t.id]: i<c ? i : i+1}, i>=c);
+      b.onclick = () => save({[t.id]: i<c ? i : i+1}, i>=c, catOf(t));
       card.querySelector(".dots").appendChild(b);
     }
     el.appendChild(card);
@@ -433,22 +465,22 @@ function renderToday(){
   renderWeek();
 }
 
-async function save(patch, up){
+async function save(patch, up, cat){
   const wasKlaar = isKlaar(log, day);
   const prev = log;
   const next = {...log, ...patch};
   next.klaar = isKlaar(next, day);
   log = next; renderToday();
   if (!await saveLog(next)){ log = prev; renderToday(); return false; }
-  if (next.klaar && !wasKlaar) showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!");
-  else if (up && !("water" in patch)) showReward(cheers[Math.floor(Math.random()*cheers.length)], "");
+  if (next.klaar && !wasKlaar) showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!", "klaar");
+  else if (up && cat) showReward(cheers[Math.floor(Math.random()*cheers.length)], "", cat);
   return true;
 }
 
 $("waterPlus").onclick = async () => {
   const goal = waterGoal(), before = log.water||0, ml = before + GLAS;
   if (!await save({water: ml}, true)) return;
-  if (before < goal && ml >= goal && !log.klaar) showReward("Fles vol!", `${fmtL(goal)} gedronken. Goed bezig!`);
+  if (before < goal && ml >= goal && !log.klaar) showReward("Fles vol!", `${fmtL(goal)} gedronken. Goed bezig!`, "water");
   else if (ml < goal){ const left = Math.ceil((goal-ml)/GLAS); toast(`Glas erbij! Nog ${left} te gaan`); }
 };
 $("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, false);
@@ -464,17 +496,24 @@ async function syncSteps(){
 }
 addEventListener("hashchange", syncSteps);
 
-function showReward(title, text){
-  const v = $("rewardVideo");
-  const pick = videos.length ? videos[Math.floor(Math.random()*videos.length)] : null;
-  $("rewardTitle").textContent = title;
-  $("rewardText").textContent = [text, pick?.van && `Filmpje van ${pick.van}`].filter(Boolean).join(" · ");
-  if (pick){ v.src = pick.url; v.hidden = false; v.play().catch(()=>{}); }
-  else v.hidden = true;
-  $("reward").hidden = false;
-  confetti();
+function showReward(title, text, cat, party = true){
+  showMedia(title, pickMedia(cat), text);
+  if (party) confetti();
 }
-$("rewardClose").onclick = () => { const v=$("rewardVideo"); v.pause(); v.removeAttribute("src"); $("reward").hidden = true; };
+// Eén scherm voor filmpje, foto of spraakbericht.
+function showMedia(title, m, text = ""){
+  closeMedia();
+  $("rewardTitle").textContent = title;
+  $("rewardText").textContent = [text, m?.van && `${SOORT[m.soort] || "Berichtje"} van ${m.van}`].filter(Boolean).join(" · ");
+  const el = m && {video:$("rewardVideo"), foto:$("rewardImg"), audio:$("rewardAudio")}[m.soort || "video"];
+  if (el){ el.src = m.url; el.hidden = false; el.play?.().catch(()=>{}); }
+  $("reward").hidden = false;
+}
+function closeMedia(){
+  for (const id of ["rewardVideo","rewardAudio"]){ const el = $(id); el.pause(); el.removeAttribute("src"); el.hidden = true; }
+  $("rewardImg").removeAttribute("src"); $("rewardImg").hidden = true;
+}
+$("rewardClose").onclick = () => { closeMedia(); $("reward").hidden = true; };
 
 function confetti(){
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -534,12 +573,14 @@ function renderSetup(){
   }
 
   const ve = $("videos");
-  ve.innerHTML = videos.length ? "" : '<p class="note">Nog geen filmpjes. Zonder filmpje krijgt hij confetti.</p>';
+  ve.innerHTML = videos.length ? "" : '<p class="note">Nog geen beloningen. Zonder bericht krijgt hij confetti.</p>';
   for (const v of videos){
     const r = document.createElement("div"); r.className="item";
-    r.innerHTML = `<div><b>${esc(v.titel)}</b>${v.van?`<small>van ${esc(v.van)}</small>`:""}</div><div><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
+    r.innerHTML = `<div><b>${esc(v.titel)}</b><small>${SOORT[v.soort] || "Filmpje"}${v.van?` van ${esc(v.van)}`:""}</small></div><div><select aria-label="Moment">${voorOptions(v.voor)}</select><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
+    const sel = r.querySelector("select");
+    sel.onchange = async () => { const {error} = await sb.from("filmpjes").update({voor: sel.value}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.voor = sel.value; };
     const [view, del] = r.querySelectorAll("button");
-    view.onclick = () => { const vid=$("rewardVideo"); $("rewardTitle").textContent=v.titel; $("rewardText").textContent=""; vid.src=v.url; vid.hidden=false; $("reward").hidden=false; vid.play().catch(()=>{}); };
+    view.onclick = () => showMedia(v.titel, v);
     del.onclick = () => confirmDelete(del, async () => {
       await sb.from("filmpjes").delete().eq("id", v.id);
       await sb.storage.from("filmpjes").remove([v.pad]);
@@ -548,7 +589,7 @@ function renderSetup(){
     ve.appendChild(r);
   }
 
-  const rolNaam = {beheer:"Beheer", deelnemer:"Afvinken", familie:"Filmpjes sturen"};
+  const rolNaam = {beheer:"Beheer", deelnemer:"Afvinken", familie:"Berichtjes sturen"};
   const pe = $("people"); pe.innerHTML = "";
   for (const p of people){
     const r = document.createElement("div"); r.className="item";
@@ -576,7 +617,7 @@ function confirmDelete(btn, fn){
 }
 function startEdit(t){
   editing = t.id;
-  $("fName").value=t.naam; $("fNote").value=t.uitleg||""; $("fTimes").value=t.keer;
+  $("fName").value=t.naam; $("fNote").value=t.uitleg||""; $("fTimes").value=t.keer; $("fSoort").value=catOf(t);
   $("formTitle").textContent="Oefening wijzigen"; $("fSubmit").textContent="Opslaan"; $("fCancel").hidden=false;
   $("fName").focus();
 }
@@ -584,7 +625,7 @@ function resetForm(){ editing=null; $("taskForm").reset(); $("fTimes").value=1; 
 $("fCancel").onclick = resetForm;
 $("taskForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)) };
+  const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)), soort:$("fSoort").value };
   if (!t.naam) return;
   // Nog geen eigen plan? Begin met een kopie van de week ervoor.
   const from = planWeek(setupWeek);
@@ -645,37 +686,96 @@ async function verklein(file, onProgress){
   } finally { URL.revokeObjectURL(url); }
 }
 
-// Zelfde upload voor jou (Instellen) en de zussen (Stuur een filmpje).
+// Foto's: langste zijde 1600 px, JPEG. Lukt het niet (bijv. HEIC op Android), dan het origineel.
+async function verkleinFoto(file){
+  try {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const out = await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.85));
+    return out && out.size < file.size ? out : file;
+  } catch { return file; }
+}
+
+// Spraakbericht inspreken. AAC (m4a) eerst, dat speelt de iPhone van papa zeker af.
+const AUDIO = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(t => window.MediaRecorder?.isTypeSupported?.(t));
+const fmtTime = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`;
+
+// Zelfde uploader voor jou (Instellen) en de zussen (Stuur een berichtje).
 for (const box of document.querySelectorAll(".uploader")){
+  box.innerHTML = `
+    <label>Bij welk moment?<select class="voor">${voorOptions("altijd")}</select></label>
+    <label>Filmpjes of foto's kiezen<input type="file" class="upload" accept="video/*,image/*,audio/*" multiple></label>
+    <div class="row"><button type="button" class="rec"${AUDIO && navigator.mediaDevices ? "" : " hidden"}>Spraakbericht inspreken</button></div>
+    <button class="primary send" hidden>Versturen</button>
+    <p class="note uploadMsg" aria-live="polite"></p>`;
   const inp = box.querySelector(".upload"), send = box.querySelector(".send"), msg = box.querySelector(".uploadMsg");
-  inp.onchange = () => {
-    const n = inp.files.length;
-    send.hidden = !n; send.textContent = n > 1 ? `Verstuur ${n} filmpjes` : "Versturen";
-    msg.textContent = n ? "Tik op Versturen. Laat daarna het scherm aan tot het klaar is." : "";
+  const recBtn = box.querySelector(".rec"), voor = box.querySelector(".voor");
+  let opnames = []; // ingesproken berichten die nog verstuurd moeten worden
+  const refresh = () => {
+    const n = inp.files.length + opnames.length;
+    send.hidden = !n; send.textContent = n > 1 ? `Verstuur ${n} berichtjes` : "Versturen";
+    if (n) msg.textContent = "Tik op Versturen. Bij filmpjes het scherm aan laten tot het klaar is.";
   };
+  inp.onchange = refresh;
+
+  let rec = null, timer = null;
+  recBtn.onclick = async () => {
+    if (rec){ rec.stop(); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
+    catch { msg.textContent = "Geen toegang tot de microfoon. Sta het toe in de instellingen van je browser."; return; }
+    const chunks = [], start = Date.now();
+    rec = new MediaRecorder(stream, {mimeType: AUDIO});
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      clearInterval(timer); stream.getTracks().forEach(t => t.stop());
+      const sec = (Date.now()-start)/1000;
+      opnames.push({blob: new Blob(chunks, {type: AUDIO.split(";")[0]}), naam: `Spraakbericht ${fmtTime(sec)}`});
+      rec = null; recBtn.classList.remove("on"); recBtn.textContent = "Nog een spraakbericht inspreken";
+      refresh();
+    };
+    rec.start(1000);
+    recBtn.classList.add("on");
+    timer = setInterval(() => {
+      const s = (Date.now()-start)/1000;
+      recBtn.textContent = `Stoppen (${fmtTime(s)})`;
+      if (s >= MAX_SEC) rec?.stop();
+    }, 250);
+    recBtn.textContent = "Stoppen (0:00)";
+  };
+
   send.onclick = async () => {
-    unlockEncoder(); // moet direct in de tik gebeuren, anders geen geluid op de iPhone
+    unlockEncoder(); // moet direct in de tik gebeuren, anders geen geluid in verkleinde filmpjes op de iPhone
+    if (rec) await new Promise(ok => { const done = rec.onstop; rec.onstop = e => { done(e); ok(); }; rec.stop(); }); // lopende opname eerst afronden
     const lock = await navigator.wakeLock?.request("screen").catch(() => null);
-    send.disabled = inp.disabled = true;
+    send.disabled = inp.disabled = recBtn.disabled = true;
+    const items = [...[...inp.files].map(f => ({file: f, naam: f.name.replace(/\.[^.]+$/,"")})), ...opnames.map(o => ({file: o.blob, naam: o.naam, audio: true}))];
     let ok = 0;
-    for (const [i, f] of [...inp.files].entries()){
-      const nr = inp.files.length > 1 ? ` (${i+1} van ${inp.files.length})` : "";
+    for (const [i, it] of items.entries()){
+      const f = it.file, nr = items.length > 1 ? ` (${i+1} van ${items.length})` : "";
+      const soort = it.audio || f.type.startsWith("audio/") ? "audio" : f.type.startsWith("image/") ? "foto" : "video";
       try {
-        const blob = await verklein(f, p => msg.textContent = `Verkleinen${nr}… ${Math.round(p*100)}%`);
-        if (blob.size > MAX_MB*1024*1024){ msg.textContent = `${f.name} is te groot (${Math.round(blob.size/1048576)} MB). Maak het filmpje korter.`; continue; }
+        const blob = soort === "video" ? await verklein(f, p => msg.textContent = `Verkleinen${nr}… ${Math.round(p*100)}%`)
+                   : soort === "foto" ? await verkleinFoto(f) : f;
+        if (blob.size > MAX_MB*1024*1024){ msg.textContent = `${it.naam} is te groot (${Math.round(blob.size/1048576)} MB). Maak het korter.`; continue; }
         msg.textContent = `Uploaden${nr}…`;
-        const ext = blob === f ? (f.name.split(".").pop() || "mp4").toLowerCase() : "mp4";
+        const type = blob.type || (soort === "video" ? "video/mp4" : soort === "foto" ? "image/jpeg" : "audio/mp4");
+        const ext = {"video/mp4":"mp4","video/quicktime":"mov","image/jpeg":"jpg","image/png":"png","image/heic":"heic","audio/mp4":"m4a","audio/x-m4a":"m4a","audio/mpeg":"mp3","audio/webm":"webm"}[type] || (f.name?.split(".").pop() || "bin").toLowerCase();
         const pad = crypto.randomUUID() + "." + ext;
-        const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: blob.type || (ext==="mov" ? "video/quicktime" : "video/mp4")});
-        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: f.name.replace(/\.[^.]+$/,""), van: me.naam || null});
-        if (row.error) msg.textContent = `Uploaden van ${f.name} lukte niet. Probeer het nog eens.`; else ok++;
+        const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: type});
+        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.naam, van: me.naam || null, soort, voor: voor.value});
+        if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet. Probeer het nog eens.`; else ok++;
       } catch {
-        msg.textContent = `${f.name} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
+        msg.textContent = `${it.naam} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
       }
     }
     lock?.release();
-    if (ok) msg.textContent = ok > 1 ? `Gelukt! ${ok} filmpjes verstuurd. Dank je wel.` : "Gelukt! Dank je wel.";
-    inp.value = ""; send.hidden = true; send.disabled = inp.disabled = false;
+    if (ok) msg.textContent = ok > 1 ? `Gelukt! ${ok} berichtjes verstuurd. Dank je wel.` : "Gelukt! Dank je wel.";
+    inp.value = ""; opnames = []; send.hidden = true; recBtn.textContent = "Spraakbericht inspreken";
+    send.disabled = inp.disabled = recBtn.disabled = false;
     await loadAll();
   };
 }
@@ -713,7 +813,7 @@ async function boot(){
   me = rij;
   canSetup = me.rol === "beheer";
   $("tabs").hidden = !(canSetup || me.rol === "familie");
-  $("tabSetup").textContent = me.rol === "familie" ? "Filmpje sturen" : "Instellen";
+  $("tabSetup").textContent = me.rol === "familie" ? "Berichtje sturen" : "Instellen";
   show(me.rol === "familie" ? "family" : "today");
   await loadAll();
 }
