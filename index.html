@@ -72,6 +72,21 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .wkbd div{display:flex;gap:4px;justify-content:center}
 .wkbd button{flex:1 1 0;max-width:40px;padding:12px 0;font-size:17px;border-color:var(--line);color:var(--ink)}
 .wkbd button.wide{max-width:64px;flex:1.6 1 0;font-size:15px}
+.past{border:2px solid var(--brand);flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.past p{color:var(--ink)!important;flex:1 1 200px}
+.days button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:14px;color:var(--muted);border:0;background:none;padding:0;font-weight:400}
+.days button:hover{color:var(--ink)}
+.hday{cursor:pointer}
+.clue{font-size:19px!important;color:var(--ink)!important;font-style:italic}
+.clue span{font-style:normal;color:var(--muted)}
+.vpic{position:relative;border-radius:10px;overflow:hidden;cursor:crosshair;touch-action:manipulation}
+.vpic canvas{display:block;width:100%;height:auto}
+.vmark{position:absolute;border:3px solid var(--sun);border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none}
+.vmark.hint{border-color:#fff;border-style:dashed;animation:knipper .5s ease-in-out 5 alternate}
+.vpic.mis{animation:schud .3s}
+@keyframes knipper{from{opacity:.2}to{opacity:1}}
+@keyframes schud{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){.vmark.hint,.vpic.mis{animation:none}}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -157,6 +172,10 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   </section>
 
   <section id="viewToday" class="view" hidden>
+    <div class="card past" id="pastBanner" hidden>
+      <p>Je kijkt naar <b id="pastName"></b>. Vergeten iets af te vinken? Dat kan hier nog.</p>
+      <button class="primary" id="backToday">Terug naar vandaag</button>
+    </div>
     <div class="card survived" id="survivedCard" hidden>
       <h2>Het zit erop!</h2>
       <p>Ben je wakker en weer een beetje bij? Tik dan hier.</p>
@@ -242,7 +261,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
         <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
         <div class="row">
           <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
-          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Woord van de dag</option></select></label>
+          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Woord van de dag</option><option value="verschillen">Zoek de verschillen</option></select></label>
           <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
@@ -251,7 +270,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
     <div class="card">
       <h2>Woord van de dag</h2>
-      <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij één woord, in 6 pogingen. Zet hieronder <b>één woord per regel</b>, in de volgorde waarin hij ze krijgt. Woorden van 3 tot 10 letters; spaties en accenten tellen niet mee.</p>
+      <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij één woord, in 6 pogingen. Zet hieronder <b>één woord per regel</b>, in de volgorde waarin hij ze krijgt. Woorden van 3 tot 10 letters. Wil je een kruiswoord-omschrijving erbij? Zet die achter een =, bijvoorbeeld <b>TAART = Zoet gebak op een verjaardag</b>.</p>
       <label>De woorden<textarea id="setPuzzel" rows="10"></textarea></label>
       <p class="note" id="woordStand"></p>
       <button class="primary" id="savePuzzel">Woorden opslaan</button>
@@ -321,6 +340,7 @@ const VOOR = {
   oefening: "Bij oefeningen",
   wandelen: "Bij wandelen",
   puzzel:   "Bij de puzzel",
+  verschillen: "Alleen als foto voor zoek de verschillen",
   water:    "Als de waterfles vol is",
   klaar:    "Als alles af is",
   ochtend:  "Goedemorgen (eerste keer openen op een dag)",
@@ -344,7 +364,7 @@ function pickMedia(cat){
   const tiers = [v => v.voor === cat && v.week === w, v => v.voor === cat];
   // Speciale momenten krijgen nooit een willekeurig ander bericht, en worden zelf nooit als reserve gebruikt.
   const SPECIAAL = ["ochtend", "operatiedag"];
-  if (!SPECIAAL.includes(cat)) tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => ![...SPECIAAL, "overleefd"].includes(v.voor));
+  if (!SPECIAAL.includes(cat)) tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => ![...SPECIAAL, "overleefd", "verschillen"].includes(v.voor));
   for (const tier of tiers){
     const pool = videos.filter(v => ok(v) && tier(v));
     if (pool.length) return pool[Math.floor(Math.random()*pool.length)];
@@ -375,8 +395,16 @@ function show(which){
 }
 
 /* ---------- Gegevens ---------- */
+// day = de dag die je bekijkt; viewDay is gezet als dat niet vandaag is.
+let viewDay = null;
+const isToday = () => day === iso(new Date());
+function goDay(d){
+  viewDay = d === iso(new Date()) ? null : d;
+  day = d; log = recent.find(r => r.datum === d) || {}; invoer = "";
+  renderHeader(); renderToday(); scrollTo({top: 0, behavior: "smooth"});
+}
 async function loadAll(){
-  day = iso(new Date());
+  day = viewDay || iso(new Date());
   // ponytail: 150 dagen terug dekt 2 weken voor de OK + 16 herstelweken; ruimer ophalen als het plan langer wordt.
   const [s, w, f, l, p] = await Promise.all([
     sb.from("instellingen").select().eq("id", 1).maybeSingle(),
@@ -410,7 +438,7 @@ async function loadAll(){
 // Eerste keer openen op een dag: een goedemorgen-bericht, alleen voor papa.
 // Op de operatiedag altijd een groet, met het speciale bericht als dat er is.
 async function greet(){
-  if (me.rol !== "deelnemer" || log.begroet) return;
+  if (me.rol !== "deelnemer" || log.begroet || !isToday()) return;
   const opDag = settings.operatie === day;
   const m = opDag ? pickMedia("operatiedag") || pickMedia("ochtend") : pickMedia("ochtend");
   if (!m && !opDag) return;
@@ -423,7 +451,7 @@ async function greet(){
 // "Operatie overleefd": vanaf de operatiedag zichtbaar, tot hij er één keer op tikt.
 const overleefdOp = () => recent.find(r => r.overleefd)?.datum || (log.overleefd ? day : null);
 function renderSurvived(){
-  const kan = settings.operatie && day >= settings.operatie && me.rol !== "familie";
+  const kan = settings.operatie && day >= settings.operatie && me.rol !== "familie" && isToday();
   $("survivedCard").hidden = !kan || !!overleefdOp();
 }
 // Berichtenregen: alle berichtjes voor "Operatie overleefd" na elkaar, oudste eerst.
@@ -469,8 +497,10 @@ function renderWeek(){
     const d = addDays(monday, i);
     const klaar = d===day ? isKlaar(log, day) : !!byDate[d]?.klaar;
     const stroke = klaar ? "var(--sun)" : d<=day ? "var(--muted)" : "var(--line)";
-    return `<div class="${d===day?"today":""}"><svg viewBox="0 0 34 32" aria-hidden="true"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/></svg>${n}</div>`;
+    const kan = d <= iso(new Date()) && d !== day;
+    return `<${kan ? `button type="button" data-d="${d}"` : "div"} class="${d===day?"today":""}" ${kan ? `aria-label="Bekijk ${n}"` : ""}><svg viewBox="0 0 34 32" aria-hidden="true"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/></svg>${n}</${kan ? "button" : "div"}>`;
   }).join("");
+  $("days").onclick = e => { const b = e.target.closest("button[data-d]"); if (b) goDay(b.dataset.d); };
   let s = 0, d = day;
   if (isKlaar(log, day)) s++;
   d = addDays(d, -1);
@@ -538,6 +568,8 @@ function renderWater(){
 
 function renderToday(){
   if (!ready) return;
+  $("pastBanner").hidden = isToday();
+  if (!isToday()) $("pastName").textContent = new Date(day+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"});
   renderWater();
   $("stepsNum").textContent = log.stappen ? log.stappen.toLocaleString("nl-NL") : "–";
   $("stepsNote").textContent = log.stappen ? "stappen vandaag, uit Gezondheid" : "Nog geen stappen vandaag.";
@@ -550,6 +582,7 @@ function renderToday(){
   for (const t of list){
     const c = Math.min(log[t.id]||0, t.keer); done += c;
     if (catOf(t) === "puzzel"){ el.appendChild(renderPuzzle(t)); continue; }
+    if (catOf(t) === "verschillen"){ el.appendChild(renderVerschillen(t)); continue; }
     const card = document.createElement("div");
     card.className = "card task" + (c>=t.keer ? " alldone" : "");
     card.innerHTML = `<h3>${esc(t.naam)}</h3>${t.uitleg?`<p>${esc(t.uitleg)}</p>`:""}<div class="dots"></div>`;
@@ -608,20 +641,119 @@ function renderHistory(){
     const ts = tasksFor(d), tot = ts.reduce((a,t) => a+t.keer, 0), done = ts.reduce((a,t) => a + Math.min(l[t.id]||0, t.keer), 0);
     const klaar = d === day ? isKlaar(log, day) : !!l.klaar;
     const stats = [l.overleefd ? "🏅 Operatie overleefd" : "", tot ? `Oefeningen ${done}/${tot}` : "", `Water ${fmtL(l.water||0)}`, l.stappen ? `${nl(l.stappen)} stappen` : ""].filter(Boolean).join(" · ");
-    const naam = d === day ? "Vandaag" : new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"});
+    const naam = d === iso(new Date()) ? "Vandaag" : new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"});
     const g = GEVOEL[l.gevoel];
-    return `<div class="hday"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
+    return `<div class="hday" role="button" tabindex="0" data-d="${d}"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
   }).join("") || '<p class="note">Nog niets om terug te kijken.</p>';
+  $("histDays").onclick = e => { const r = e.target.closest(".hday"); if (r) goDay(r.dataset.d); };
+}
+
+/* ---------- Zoek de verschillen: eigen foto + kopie met 7 kleine verschillen ---------- */
+const VERSCHILLEN = 7, VHINTS = 3;
+const vFotos = () => { const eigen = videos.filter(v => v.soort === "foto" && v.voor === "verschillen"); return eigen.length ? eigen : videos.filter(v => v.soort === "foto"); };
+const vNr = () => recent.filter(r => r.datum < day && r.verschilKlaar).length;
+const vCache = {};
+function seeded(str){
+  let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507) ^ Math.imul(h ^ (h >>> 13), 3266489909); return ((h ^= h >>> 16) >>> 0) / 2**32; };
+}
+// Maakt de twee plaatjes één keer per foto. Alleen tekenen met clip + mengmodus: werkt ook op oudere iPhones.
+function maakVerschillen(foto, klaar){
+  const key = foto.id;
+  if (vCache[key]) return vCache[key].ready ? vCache[key] : null;
+  const c = vCache[key] = {ready: false};
+  const img = new Image();
+  img.onload = () => {
+    const sc = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const W = Math.round(img.naturalWidth*sc), H = Math.round(img.naturalHeight*sc);
+    const mk = () => { const cv = document.createElement("canvas"); cv.width = W; cv.height = H; return cv; };
+    const A = mk(), B = mk();
+    A.getContext("2d").drawImage(img, 0, 0, W, H);
+    const ctx = B.getContext("2d"); ctx.drawImage(A, 0, 0);
+    const rnd = seeded(foto.id), m = Math.min(W, H), diffs = [];
+    const soorten = ["kleur", "spiegel", "kloon", "licht", "draai", "donker", "kleur"];
+    for (let k = 0, tries = 0; k < VERSCHILLEN && tries < 500; tries++){
+      const r = m * (0.035 + rnd()*0.02), x = r + rnd()*(W-2*r), y = r + rnd()*(H-2*r);
+      if (diffs.some(d => Math.hypot(d.x-x, d.y-y) < (d.r+r)*1.6)) continue;
+      const soort = soorten[k];
+      ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 2*Math.PI); ctx.clip();
+      if (soort === "kleur"){ ctx.globalCompositeOperation = "hue"; ctx.fillStyle = `hsl(${Math.floor(rnd()*360)},80%,50%)`; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
+      else if (soort === "licht"){ ctx.globalCompositeOperation = "screen"; ctx.fillStyle = "rgba(255,255,255,.32)"; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
+      else if (soort === "donker"){ ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = "rgb(150,150,150)"; ctx.fillRect(x-r, y-r, 2*r, 2*r); }
+      else if (soort === "spiegel"){ ctx.translate(2*x, 0); ctx.scale(-1, 1); ctx.drawImage(A, 0, 0); }
+      else if (soort === "draai"){ ctx.translate(x, y); ctx.rotate(Math.PI); ctx.translate(-x, -y); ctx.drawImage(A, 0, 0); }
+      else { const dx = (rnd() < .5 ? -1 : 1) * r * (2.5 + rnd()*2), dy = (rnd() - .5) * r * 3; ctx.drawImage(A, dx, dy); }
+      ctx.restore();
+      diffs.push({x, y, r}); k++;
+    }
+    Object.assign(c, {ready: true, A, B, W, H, diffs});
+    klaar();
+  };
+  img.onerror = () => { c.fout = true; klaar(); };
+  img.src = foto.url;
+  return null;
+}
+function renderVerschillen(t){
+  const card = document.createElement("div");
+  const fotos = vFotos(), gevonden = log.verschil || [], klaar = !!log.verschilKlaar;
+  card.className = "card task" + (klaar ? " alldone" : "");
+  card.innerHTML = `<h3>${esc(t.naam)}</h3>`;
+  if (!fotos.length){ card.insertAdjacentHTML("beforeend", `<p>Nog geen foto's. Zet foto's klaar bij Instellen → Beloningen (kies het moment "Alleen als foto voor zoek de verschillen").</p>`); return card; }
+  const foto = fotos[vNr() % fotos.length], v = maakVerschillen(foto, () => renderToday());
+  if (!v){ card.insertAdjacentHTML("beforeend", `<p>${vCache[foto.id]?.fout ? "Deze foto kon niet geladen worden." : "Foto laden…"}</p>`); return card; }
+  card.insertAdjacentHTML("beforeend", `<p>${t.uitleg ? esc(t.uitleg) : `Er zijn ${VERSCHILLEN} verschillen tussen de twee foto's. Tik ze aan, op welke foto je wilt.`}</p>`);
+  for (const cv of [v.A, v.B]){
+    const box = document.createElement("div"); box.className = "vpic";
+    box.appendChild(cv);
+    v.diffs.forEach((d, i) => {
+      if (!gevonden.includes(i) && !(klaar)) return;
+      box.insertAdjacentHTML("beforeend", `<span class="vmark" style="left:${(d.x-d.r*1.3)/v.W*100}%;top:${(d.y-d.r*1.3)/v.H*100}%;width:${d.r*2.6/v.W*100}%;height:${d.r*2.6/v.H*100}%"></span>`);
+    });
+    if (!klaar) box.onclick = e => {
+      const b = cv.getBoundingClientRect(), x = (e.clientX-b.left)/b.width*v.W, y = (e.clientY-b.top)/b.height*v.H;
+      const i = v.diffs.findIndex((d, i) => !gevonden.includes(i) && Math.hypot(d.x-x, d.y-y) <= d.r*1.5);
+      if (i < 0){ box.classList.remove("mis"); void box.offsetWidth; box.classList.add("mis"); return; }
+      const verschil = [...gevonden, i];
+      if (verschil.length >= v.diffs.length) save({verschil, verschilKlaar: true, [t.id]: 1}, {cat: "puzzel", title: "Alles gevonden!", text: "Scherp gezien. Morgen een nieuwe foto."});
+      else { log = {...log, verschil}; renderToday(); saveLog(log); }
+    };
+    card.appendChild(box);
+  }
+  const over = VHINTS - (log.vhints || 0);
+  const row = document.createElement("div"); row.className = "row";
+  row.insertAdjacentHTML("beforeend", `<span class="note">${klaar ? "Alles gevonden!" : `${gevonden.length} van ${v.diffs.length} gevonden`}</span>`);
+  if (!klaar){
+    const hint = document.createElement("button"); hint.textContent = `Hint (${over} over)`; hint.disabled = over <= 0;
+    hint.onclick = () => {
+      const open = v.diffs.map((d, i) => i).filter(i => !gevonden.includes(i));
+      const d = v.diffs[open[Math.floor(Math.random()*open.length)]];
+      log = {...log, vhints: (log.vhints || 0) + 1}; saveLog(log); renderToday();
+      // Even laten oplichten waar het zit; hij moet het daarna zelf aantikken.
+      for (const box of card.ownerDocument.querySelectorAll(".vpic")){
+        box.insertAdjacentHTML("beforeend", `<span class="vmark hint" style="left:${(d.x-d.r*2.5)/v.W*100}%;top:${(d.y-d.r*2.5)/v.H*100}%;width:${d.r*5/v.W*100}%;height:${d.r*5/v.H*100}%"></span>`);
+      }
+      setTimeout(() => document.querySelectorAll(".vmark.hint").forEach(el => el.remove()), 2500);
+    };
+    row.prepend(hint);
+  }
+  card.appendChild(row);
+  return card;
 }
 
 /* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
 const WOORDEN = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAARS\nHAVEN\nZWAAN\nBROOD\nPAARD\nSCHIP";
 const POGINGEN = 6;
 const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-const woordenlijst = () => norm(settings.puzzel || WOORDEN).split(/[\n,;]+/).map(w => w.replace(/\s+/g, "")).filter(w => /^[A-Z]{3,10}$/.test(w));
+// Eén per regel: "WOORD" of "WOORD = omschrijving" (een dubbele punt mag ook).
+const woordItems = () => (settings.puzzel || WOORDEN).split(/\n+/).map(regel => {
+  const [w, ...rest] = regel.split(/[=:]/);
+  return {w: norm(w).replace(/[^A-Z]/g, ""), clue: rest.join(":").trim()};
+}).filter(x => x.w.length >= 3 && x.w.length <= 10);
+const woordenlijst = () => woordItems().map(x => x.w);
 const woordNr = () => recent.filter(r => r.datum < day && r.puzzel).length;
 // Welk woord vandaag: telt door op gespeelde dagen, dus een dag overslaan = gewoon het volgende woord.
 const woordVanDaag = () => { const ws = woordenlijst(); return ws[woordNr() % ws.length]; };
+const clueVanDaag = () => { const it = woordItems(); return it[woordNr() % it.length]?.clue || ""; };
 // Per letter: "goed" (juiste plek), "bijna" (zit erin, andere plek) of "mis". Dubbele letters tellen niet dubbel.
 function score(gok, woord){
   const n = woord.length, uit = Array(n).fill("mis"), over = {};
@@ -635,7 +767,8 @@ function renderPuzzle(t){
   const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel;
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
-  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
+  const clue = clueVanDaag();
+  card.innerHTML = `<h3>${esc(t.naam)}</h3>${clue ? `<p class="clue">${esc(clue)} <span>(${woord.length})</span></p>` : ""}<p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
   const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 7 ? " lang" : "");
   grid.style.setProperty("--n", woord.length);
   for (let r = 0; r < POGINGEN; r++){
@@ -684,7 +817,8 @@ async function save(patch, reward){
   let next = {...log, ...patch};
   next.klaar = isKlaar(next, day);
   let m = null;
-  if (next.klaar && !wasKlaar) m = showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!", "klaar");
+  if (!isToday()) {}
+  else if (next.klaar && !wasKlaar) m = showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!", "klaar");
   else if (reward) m = showReward(reward.title || cheers[Math.floor(Math.random()*cheers.length)], reward.text || "", reward.cat);
   next = markSeen(next, m);
   log = next; renderToday();
@@ -703,7 +837,7 @@ $("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, 
 // De iPhone-opdracht opent de app als ...#stappen1234. Tolerant voor "4,231" of "4231.0".
 async function syncSteps(){
   const m = decodeURIComponent(location.hash).match(/^#stappen([\d.,\s]+)/i);
-  if (!m || !ready || me.rol === "familie") return;
+  if (!m || !ready || me.rol === "familie" || !isToday()) return;
   const n = parseInt(m[1].replace(/[.,]0+$/,"").replace(/\D/g,""), 10);
   if (!n || log.stappen === n) return;
   log = {...log, stappen: n}; renderToday();
@@ -868,7 +1002,7 @@ $("fCancel").onclick = resetForm;
 $("taskForm").addEventListener("submit", async e => {
   e.preventDefault();
   const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)), soort:$("fSoort").value };
-  if (t.soort === "puzzel") t.keer = 1; // één stukje per dag
+  if (t.soort === "puzzel" || t.soort === "verschillen") t.keer = 1; // één per dag
   if (!t.naam) return;
   // Nog geen eigen plan? Begin met een kopie van de week ervoor.
   const from = planWeek(setupWeek);
@@ -1040,6 +1174,7 @@ for (const box of document.querySelectorAll(".uploader")){
   };
 }
 $("tabToday").onclick = () => show("today");
+$("backToday").onclick = () => goDay(iso(new Date()));
 $("tabSetup").onclick = () => show(me.rol === "familie" ? "family" : "setup");
 for (const b of document.querySelectorAll(".logout")) b.onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
