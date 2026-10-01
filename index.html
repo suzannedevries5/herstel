@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Herstel">
+<title>Papa's Herstelplan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>
+// >>> Vul deze twee in: Supabase → Project Settings → API <<<
+const SUPABASE_URL = "https://bryisthwmrsztuucsrof.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_wQ0Xv3OUAOAs5D-jxUI6fQ_x1mjNAgt";
+</script>
+<style>
+:root{
+  --bg:#EEF3F1; --card:#FFFFFF; --ink:#15262B; --muted:#5A6E72; --line:#D3DEDB;
+  --brand:#1F5A63; --brand-ink:#FFFFFF; --sun:#F2B632; --done:#2E8B57; --danger:#B3402E;
+  --water:#3E97D1; --glass:#E4EEF3;
+  --font:"Atkinson Hyperlegible",system-ui,sans-serif;
+  --display:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0F1A1C; --card:#172629; --ink:#E8F0EE; --muted:#9AB0B2; --line:#2A3D40;
+  --brand:#5FB3BD; --brand-ink:#0F1A1C; --sun:#F2C14E; --done:#5CC08A; --danger:#E0735F;
+  --water:#4FA8E0; --glass:#1E3236; color-scheme:dark;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 var(--font)}
+.wrap{max-width:640px;margin:0 auto;padding-block:24px 64px;padding-inline:16px;display:flex;flex-direction:column;gap:20px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+h1{font:800 clamp(28px,7vw,40px)/1.1 var(--display);margin:0;text-wrap:balance}
+h2{font:600 22px/1.2 var(--display);margin:0}
+h3{margin:0;font-size:20px}
+.sub{color:var(--muted);margin:4px 0 0}
+.daypill{display:inline-block;background:var(--sun);color:#15262B;font-weight:700;border-radius:999px;padding:2px 12px;font-size:15px;letter-spacing:.02em}
+.tabs{display:flex;gap:8px}
+button{font:inherit;cursor:pointer;border-radius:12px;border:2px solid var(--brand);background:transparent;color:var(--brand);padding:8px 14px;font-weight:700}
+button.primary{background:var(--brand);color:var(--brand-ink)}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+button.link{border:0;padding:4px 6px;font-weight:400;text-decoration:underline}
+button.link.danger{color:var(--danger)}
+.view{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.card p{margin:0;color:var(--muted);font-size:16px}
+.weekhead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.streak{font-weight:700;color:var(--brand)}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}
+.days div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:14px;color:var(--muted)}
+.days svg{width:34px;height:34px}
+.days .today{color:var(--ink);font-weight:700}
+.progress{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
+.progress>div{height:100%;background:var(--done);transition:width .4s}
+.list{display:flex;flex-direction:column;gap:12px}
+.task.alldone{border-color:var(--done)}
+.dots{display:flex;gap:10px;flex-wrap:wrap}
+.dot{width:60px;height:60px;border-radius:50%;border:3px solid var(--brand);background:transparent;color:var(--brand);font-size:26px;padding:0;display:grid;place-items:center}
+.dot.on{background:var(--done);border-color:var(--done);color:#fff}
+.waterbox{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.bottle{width:110px;flex:none}
+.bottle .fill{transform-box:fill-box;transform-origin:bottom;transition:transform .6s cubic-bezier(.3,1.4,.5,1)}
+.waterinfo{flex:1 1 180px;display:flex;flex-direction:column;gap:10px}
+.big{font:800 34px/1 var(--display);font-variant-numeric:tabular-nums}
+.big small{font:400 18px var(--font);color:var(--muted)}
+.waterbtns{display:flex;gap:10px;flex-wrap:wrap}
+.waterbtns .primary{font-size:20px;padding:12px 18px;background:var(--water);border-color:var(--water);color:#fff}
+.chart{width:100%;height:auto;display:block;touch-action:manipulation}
+.chart text{fill:var(--muted);font:12px var(--font);font-variant-numeric:tabular-nums}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart .bar.sel{fill:var(--sun)}
+#stepsReadout{min-height:1.5em;font-variant-numeric:tabular-nums}
+.uploader{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.empty{background:var(--card);border:2px dashed var(--line);border-radius:16px;padding:20px;color:var(--muted)}
+form{display:flex;flex-direction:column;gap:12px}
+#taskForm{border-top:1px solid var(--line);padding-top:12px}
+label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:16px}
+input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg);color:var(--ink);width:100%}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}.row>label{flex:1 1 140px}
+.weeks{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.weeks button{flex:none;padding:6px 12px;font-size:15px}
+.weeks button:not(.has):not(.primary){border-style:dashed}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:10px;flex-wrap:wrap}
+.item small{color:var(--muted);display:block}
+.note{font-size:15px;color:var(--muted);margin:0}
+#reward{position:fixed;inset:0;background:rgba(10,20,22,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px 16px;z-index:10;text-align:center;color:#fff}
+#reward h2{font-size:clamp(30px,8vw,48px);color:var(--sun)}
+#reward p{margin:0;font-size:20px}
+#reward video{max-width:100%;max-height:60vh;border-radius:16px;background:#000}
+#reward button{background:var(--sun);border-color:var(--sun);color:#15262B;font-size:20px;padding:12px 28px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:700;z-index:9;max-width:calc(100% - 32px);text-align:center}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:11}
+@media (prefers-reduced-motion:reduce){.progress>div,.bottle .fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <span class="daypill" id="daypill" hidden></span>
+      <h1 id="hello">Herstelplan</h1>
+      <p class="sub" id="today"></p>
+    </div>
+    <div class="tabs" id="tabs" hidden>
+      <button id="tabToday" class="primary">Vandaag</button>
+      <button id="tabSetup">Instellen</button>
+    </div>
+  </header>
+
+  <section id="viewLogin" class="view" hidden>
+    <div class="card">
+      <h2>Inloggen</h2>
+      <form id="loginForm">
+        <label>E-mailadres<input id="loginEmail" type="email" autocomplete="email" required></label>
+        <label>Wachtwoord<input id="loginPass" type="password" autocomplete="current-password" minlength="8" required></label>
+        <div class="row">
+          <button class="primary" type="submit">Inloggen</button>
+          <button type="button" id="signup">Eerste keer? Account maken</button>
+        </div>
+      </form>
+      <p class="note" id="loginMsg"></p>
+    </div>
+  </section>
+
+  <section id="viewToday" class="view" hidden>
+    <div class="card">
+      <div class="weekhead"><h2>Deze week</h2><span class="streak" id="streak"></span></div>
+      <div class="days" id="days"></div>
+    </div>
+
+    <div>
+      <div class="progress" aria-hidden="true"><div id="bar" style="width:0"></div></div>
+      <p class="sub" id="progressText">Laden…</p>
+    </div>
+
+    <div class="card">
+      <h3>Stappen</h3>
+      <div class="big" id="stepsNum">–</div>
+      <p id="stepsNote"></p>
+      <div id="stepsChartBox" hidden>
+        <p id="stepsReadout" aria-live="polite"></p>
+        <svg class="chart" id="stepsChart" viewBox="0 0 360 160" role="img" aria-label="Stappen per dag, laatste 30 dagen"></svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Drinken</h3>
+      <div class="waterbox">
+        <svg class="bottle" viewBox="0 0 120 260" role="img" aria-labelledby="litres">
+          <defs><clipPath id="bottleClip"><path d="M44 8h32v30c0 8 28 18 28 44v158c0 8-6 14-14 14H30c-8 0-14-6-14-14V82c0-26 28-36 28-44z"/></clipPath></defs>
+          <path d="M44 8h32v30c0 8 28 18 28 44v158c0 8-6 14-14 14H30c-8 0-14-6-14-14V82c0-26 28-36 28-44z" fill="var(--glass)"/>
+          <g clip-path="url(#bottleClip)"><rect class="fill" id="waterFill" x="0" y="54" width="120" height="200" fill="var(--water)" style="transform:scaleY(0)"/></g>
+          <g id="ticks" stroke="var(--muted)" stroke-width="2" opacity=".5"></g>
+          <path d="M44 8h32v30c0 8 28 18 28 44v158c0 8-6 14-14 14H30c-8 0-14-6-14-14V82c0-26 28-36 28-44z" fill="none" stroke="var(--brand)" stroke-width="4"/>
+          <rect x="40" y="0" width="40" height="14" rx="4" fill="var(--brand)"/>
+        </svg>
+        <div class="waterinfo">
+          <div class="big" id="litres">0 L <small>van 2 L</small></div>
+          <p id="waterLeft"></p>
+          <div class="waterbtns">
+            <button class="primary" id="waterPlus">+ glas (250 ml)</button>
+            <button id="waterMin" aria-label="Glas eraf">−</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="list" id="tasks"></div>
+  </section>
+
+  <section id="viewSetup" class="view" hidden>
+    <div class="card">
+      <h2>Algemeen</h2>
+      <div class="row">
+        <label>Naam op het scherm<input id="setName" placeholder="Papa"></label>
+        <label>Datum operatie<input id="setOp" type="date"></label>
+        <label>Minimaal drinken (liter)<input id="setWater" type="number" min="0.5" max="4" step="0.25" placeholder="2"></label>
+      </div>
+      <button class="primary" id="saveSettings">Opslaan</button>
+    </div>
+
+    <div class="card">
+      <h2>Plan per week</h2>
+      <p>Een week zonder eigen plan gebruikt het plan van de week ervoor. Stippellijn = geen eigen plan.</p>
+      <div class="weeks" id="weeks"></div>
+      <p class="note" id="weekInfo"></p>
+      <div id="weekTasks"></div>
+      <form id="taskForm">
+        <h3 id="formTitle">Oefening toevoegen</h3>
+        <label>Wat moet hij doen?<input id="fName" required maxlength="80" placeholder="Bekkenbodem aanspannen"></label>
+        <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
+        <div class="row">
+          <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
+          <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
+          <button type="button" id="fCancel" hidden>Annuleren</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Filmpjes als beloning</h2>
+      <p>Na elk vinkje speelt een willekeurig filmpje. Filmpjes van je iPhone kunnen gewoon, tot 3 minuten. Ze worden eerst verkleind tot 720p.</p>
+      <div class="uploader"><input type="file" class="upload" accept="video/*" multiple><button class="primary send" hidden>Versturen</button><p class="note uploadMsg"></p></div>
+      <div id="videos"></div>
+    </div>
+
+    <div class="card">
+      <h2>Wie mag erin?</h2>
+      <p><b>Afvinken</b>: ziet alleen het plan van vandaag. <b>Filmpjes sturen</b>: kan alleen filmpjes uploaden. Ze openen de link, tikken op <b>Account maken</b> en kiezen zelf een wachtwoord, met precies het e-mailadres dat je hier invult.</p>
+      <div id="people"></div>
+      <form id="personForm">
+        <div class="row">
+          <label>Naam<input id="pName" required maxlength="40" placeholder="Anne"></label>
+          <label>E-mailadres<input id="pEmail" type="email" required></label>
+        </div>
+        <div class="row">
+          <label>Mag<select id="pRol"><option value="familie">Filmpjes sturen</option><option value="deelnemer">Afvinken (papa)</option></select></label>
+          <button class="primary" type="submit">Toevoegen</button>
+        </div>
+      </form>
+    </div>
+
+    <button class="link logout">Uitloggen</button>
+  </section>
+
+  <section id="viewFamily" class="view" hidden>
+    <div class="card">
+      <h2>Stuur een filmpje</h2>
+      <p id="familyIntro">Elke keer dat hij een oefening afvinkt, krijgt hij een willekeurig filmpje te zien. Een kort berichtje van jou maakt zijn dag. Filmpjes van je iPhone kunnen gewoon, tot 3 minuten. Ze worden eerst verkleind, dat duurt net zo lang als het filmpje zelf.</p>
+      <div class="uploader"><input type="file" class="upload" accept="video/*" multiple><button class="primary send" hidden>Versturen</button><p class="note uploadMsg"></p></div>
+      <p class="note" id="familyCount"></p>
+    </div>
+    <button class="link logout">Uitloggen</button>
+  </section>
+</div>
+
+<div id="reward" hidden role="dialog" aria-modal="true" aria-labelledby="rewardTitle">
+  <h2 id="rewardTitle">Goed gedaan!</h2>
+  <p id="rewardText"></p>
+  <video id="rewardVideo" playsinline controls hidden></video>
+  <button id="rewardClose">Verder</button>
+</div>
+<div id="toast" hidden></div>
+<canvas id="confetti" hidden></canvas>
+
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const iso = d => d.toLocaleDateString("sv-SE"); // yyyy-mm-dd, lokale tijd
+const addDays = (s, n) => { const d = new Date(s+"T12:00"); d.setDate(d.getDate()+n); return iso(d); };
+const diffDays = (a, b) => Math.round((new Date(a+"T12:00") - new Date(b+"T12:00"))/864e5);
+const MAXWEEK = 16, GLAS = 250;
+const cheers = ["Top gedaan!", "Weer een stap vooruit!", "Kanjer!", "Zo kom je er wel!", "Lekker bezig!"];
+
+let canSetup = false, ready = false, me = {}, people = [];
+let weken = {}, videos = [], settings = {}, log = {}, recent = [], day = iso(new Date());
+let setupWeek = null, editing = null;
+
+function esc(s){ const d=document.createElement("div"); d.textContent=s??""; return d.innerHTML; }
+function waterGoal(){ return Math.round((+settings.water || 2) * 1000); }
+// Week 0 = voor de operatie, week 1 = dag 0–6 na de operatie, enz.
+function weekOf(date){ if (!settings.operatie) return 1; const n = diffDays(date, settings.operatie); return n < 0 ? 0 : Math.min(MAXWEEK, Math.floor(n/7)+1); }
+function planWeek(w){ for (let i=w; i>=0; i--) if (weken[i]) return i; return null; }
+function tasksFor(date){ const w = planWeek(weekOf(date)); return w==null ? [] : weken[w]; }
+function isKlaar(l, date){ return tasksFor(date).every(t => (l[t.id]||0) >= t.keer) && (l.water||0) >= waterGoal(); }
+const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) + " L";
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
+function show(which){
+  for (const v of ["Login","Today","Setup","Family"]) $("view"+v).hidden = v.toLowerCase()!==which;
+  $("tabToday").className = which==="today"?"primary":""; $("tabSetup").className = which==="setup"?"primary":"";
+  if (which==="setup") renderSetup();
+}
+
+/* ---------- Gegevens ---------- */
+async function loadAll(){
+  day = iso(new Date());
+  // ponytail: 150 dagen terug dekt 2 weken voor de OK + 16 herstelweken; ruimer ophalen als het plan langer wordt.
+  const [s, w, f, l, p] = await Promise.all([
+    sb.from("instellingen").select().eq("id", 1).maybeSingle(),
+    sb.from("weken").select(),
+    sb.from("filmpjes").select().order("gemaakt"),
+    sb.from("log").select().gte("datum", addDays(day, -150)),
+    canSetup ? sb.from("toegang").select().order("rol") : {data: []},
+  ]);
+  if (s.error || w.error || f.error || l.error || p.error){ toast("Laden lukte niet. Controleer je internet."); return; }
+  settings = s.data || {};
+  people = p.data;
+  weken = {}; for (const r of w.data) weken[r.week] = r.oefeningen || [];
+  recent = l.data.map(r => ({...r.data, datum: r.datum}));
+  log = recent.find(r => r.datum === day) || {};
+  // Filmpjes staan privé; tijdelijke links vooraf maken zodat ze direct kunnen spelen.
+  videos = f.data;
+  if (videos.length){
+    const {data} = await sb.storage.from("filmpjes").createSignedUrls(videos.map(v => v.pad), 86400);
+    const byPath = Object.fromEntries((data||[]).map(d => [d.path, d.signedUrl]));
+    videos.forEach(v => v.url = byPath[v.pad]);
+    videos = videos.filter(v => v.url);
+  }
+  ready = true;
+  renderHeader(); renderToday(); if (!$("viewSetup").hidden) renderSetup();
+  const mine = videos.filter(v => v.van === me.naam).length;
+  $("familyCount").textContent = videos.length ? `Er staan ${videos.length} filmpjes klaar${mine ? `, waarvan ${mine} van jou` : ""}.` : "Er staan nog geen filmpjes klaar. Jij mag de eerste zijn!";
+  syncSteps();
+}
+async function saveLog(next){
+  const {error} = await sb.from("log").upsert({datum: day, data: next});
+  if (error){ toast("Opslaan lukte niet. Probeer het zo nog eens."); return false; }
+  recent = [...recent.filter(r => r.datum !== day), {...next, datum: day}];
+  return true;
+}
+
+/* ---------- Vandaag ---------- */
+function renderHeader(){
+  const naam = settings.naam || "Papa";
+  const h = new Date().getHours();
+  $("hello").textContent = me.rol === "familie" ? `Hoi ${me.naam || ""}`.trim() : (h<12?"Goedemorgen":h<18?"Goedemiddag":"Goedenavond") + ", " + naam;
+  $("today").textContent = new Date(day+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"});
+  if (settings.operatie){
+    const n = diffDays(day, settings.operatie);
+    $("daypill").hidden = false;
+    $("daypill").textContent = n>0 ? `Dag ${n} na de operatie · week ${weekOf(day)}` : n===0 ? "Operatiedag" : `Nog ${-n} ${-n===1?"dag":"dagen"} tot de operatie`;
+  } else $("daypill").hidden = true;
+}
+
+const STAR = 'M17 3l4.2 8.6 9.4 1.4-6.8 6.6 1.6 9.4L17 24.6 8.6 29l1.6-9.4L3.4 13l9.4-1.4z';
+function renderWeek(){
+  const byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
+  const monday = addDays(day, -((new Date(day+"T12:00").getDay()+6)%7));
+  $("days").innerHTML = ["ma","di","wo","do","vr","za","zo"].map((n,i) => {
+    const d = addDays(monday, i);
+    const klaar = d===day ? isKlaar(log, day) : !!byDate[d]?.klaar;
+    const stroke = klaar ? "var(--sun)" : d<=day ? "var(--muted)" : "var(--line)";
+    return `<div class="${d===day?"today":""}"><svg viewBox="0 0 34 32" aria-hidden="true"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/></svg>${n}</div>`;
+  }).join("");
+  let s = 0, d = day;
+  if (isKlaar(log, day)) s++;
+  d = addDays(d, -1);
+  while (byDate[d]?.klaar){ s++; d = addDays(d,-1); }
+  $("streak").textContent = s>=2 ? `${s} dagen op rij alles af!` : s===1 ? "1 dag alles af" : "";
+}
+
+// Na de operatie: gemiddelde stappen per dag per herstelweek, met "Voor" (2 weken voor de OK) als ijkpunt.
+// Zonder (verstreken) operatiedatum: per dag, laatste 30 dagen. Tik op een staaf voor het getal.
+function renderStepsChart(){
+  const byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
+  const stepsOn = d => (d===day ? log : byDate[d])?.stappen || 0;
+  const nl = n => n.toLocaleString("nl-NL");
+  const fmtDay = d => new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"});
+  const avgOf = (from, n) => { const xs = Array.from({length:n}, (_,i) => addDays(from,i)).filter(d => d<=day).map(stepsOn).filter(v=>v); return xs.length ? Math.round(xs.reduce((a,b)=>a+b,0)/xs.length) : 0; };
+  let bars, title, ref = 0;
+  const op = settings.operatie;
+  if (op && op <= day){
+    bars = [{label:"Voor", v: avgOf(addDays(op,-14), 14), info:"2 weken voor de operatie"}];
+    for (let w=1; w<=weekOf(day); w++) bars.push({label:"W"+w, v: avgOf(addDays(op,(w-1)*7), 7), info:`Week ${w}`});
+    bars.forEach(b => b.text = `${b.info}: ${b.v ? "gemiddeld "+nl(b.v)+" stappen per dag" : "geen gegevens"}`);
+    ref = bars[0].v;
+    title = ref ? "Gemiddeld per dag, per week. Stippellijn = voor de operatie." : "Gemiddeld per dag, per week sinds de operatie.";
+  } else {
+    bars = Array.from({length:30}, (_,i) => { const d = addDays(day, i-29), v = stepsOn(d); return {label:"", d, v, text:`${fmtDay(d)}: ${v ? nl(v)+" stappen" : "geen gegevens"}`}; });
+    const xs = bars.map(b=>b.v).filter(v=>v);
+    title = xs.length ? `Gemiddeld ${nl(Math.round(xs.reduce((a,b)=>a+b,0)/xs.length))} per dag (laatste 30 dagen)` : "";
+  }
+  const filled = bars.filter(b => b.v).length;
+  $("stepsChartBox").hidden = filled < 2;
+  if (filled < 2) return;
+
+  const W=360, H=160, L=38, T=8, B=22, h=H-T-B, base=T+h, band=(W-L)/bars.length;
+  const max = Math.max(1000, Math.ceil(Math.max(...bars.map(b=>b.v))/1000)*1000);
+  const y = v => base - v/max*h;
+  let s = "";
+  for (const t of [0, max/2, max]) s += `<line x1="${L}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end">${t>=1000 ? (t/1000).toLocaleString("nl-NL")+"k" : t}</text>`;
+  if (ref) s += `<line x1="${L}" x2="${W}" y1="${y(ref)}" y2="${y(ref)}" stroke="var(--sun)" stroke-width="2" stroke-dasharray="4 4"/>`;
+  bars.forEach((b,i) => {
+    if (b.v){
+      const w = Math.min(28, band-2), x = L + i*band + (band-w)/2, top = y(b.v), r = Math.min(4, w/2, base-top);
+      s += `<path class="bar" data-i="${i}" fill="var(--brand)" d="M${x},${base}V${top+r}q0,-${r} ${r},-${r}h${w-2*r}q${r},0 ${r},${r}V${base}z"/>`;
+    }
+    // Weeklabels onder elke staaf, of om de week als het krap wordt.
+    if (b.label && (band >= 18 || i%2===0)) s += `<text x="${L+i*band+band/2}" y="${H-4}" text-anchor="middle">${b.label}</text>`;
+    s += `<rect class="hit" data-i="${i}" x="${L+i*band}" y="${T}" width="${band}" height="${h}"/>`;
+  });
+  if (!bars[0].label) s += `<text x="${L}" y="${H-4}">${fmtDay(bars[0].d)}</text><text x="${W}" y="${H-4}" text-anchor="end">vandaag</text>`;
+  const svg = $("stepsChart"); svg.innerHTML = s;
+  const select = i => { svg.querySelectorAll(".bar").forEach(el => el.classList.toggle("sel", el.dataset.i==i)); $("stepsReadout").textContent = i==null ? title : bars[i].text; };
+  svg.querySelectorAll(".hit").forEach(r => { r.onpointerenter = r.onclick = () => select(+r.dataset.i); });
+  svg.onpointerleave = e => { if (e.pointerType === "mouse") select(null); }; // op touch blijft de keuze staan
+  select(null);
+}
+
+function renderWater(){
+  const goal = waterGoal(), ml = log.water||0, ticks = goal/GLAS;
+  $("waterFill").style.transform = `scaleY(${Math.min(1, ml/goal)})`;
+  $("ticks").innerHTML = Array.from({length:ticks-1},(_,i)=>{ const y = 254 - (i+1)*(200/ticks); return `<line x1="16" x2="30" y1="${y}" y2="${y}"/>`; }).join("");
+  $("litres").innerHTML = `${fmtL(ml)} <small>van ${fmtL(goal)}</small>`;
+  const left = Math.ceil((goal-ml)/GLAS);
+  $("waterLeft").textContent = ml>=goal ? "Fles vol! Extra drinken mag altijd." : `Nog ${left} ${left===1?"glas":"glazen"} te gaan`;
+  $("waterMin").disabled = ml<=0;
+}
+
+function renderToday(){
+  if (!ready) return;
+  renderWater();
+  $("stepsNum").textContent = log.stappen ? log.stappen.toLocaleString("nl-NL") : "–";
+  $("stepsNote").textContent = log.stappen ? "stappen vandaag, uit Gezondheid" : "Nog geen stappen vandaag.";
+  renderStepsChart();
+  const list = tasksFor(day), el = $("tasks"); el.innerHTML = "";
+  if (!list.length) el.innerHTML = '<div class="empty">Vandaag alleen drinken. Verder staat er niets op het plan.</div>';
+  const goal = waterGoal();
+  const total = list.reduce((a,t)=>a+t.keer,0) + goal/GLAS;
+  let done = Math.min(log.water||0, goal)/GLAS;
+  for (const t of list){
+    const c = Math.min(log[t.id]||0, t.keer); done += c;
+    const card = document.createElement("div");
+    card.className = "card task" + (c>=t.keer ? " alldone" : "");
+    card.innerHTML = `<h3>${esc(t.naam)}</h3>${t.uitleg?`<p>${esc(t.uitleg)}</p>`:""}<div class="dots"></div>`;
+    for (let i=0;i<t.keer;i++){
+      const b = document.createElement("button");
+      b.className = "dot" + (i<c?" on":"");
+      b.textContent = i<c ? "✓" : String(i+1);
+      b.setAttribute("aria-label", `${t.naam}, keer ${i+1} ${i<c?"gedaan, tik om terug te zetten":"afvinken"}`);
+      b.onclick = () => save({[t.id]: i<c ? i : i+1}, i>=c);
+      card.querySelector(".dots").appendChild(b);
+    }
+    el.appendChild(card);
+  }
+  $("bar").style.width = (done/total*100)+"%";
+  $("progressText").textContent = done>=total ? "Alles gedaan vandaag!" : `${Math.round(done/total*100)}% van vandaag gedaan`;
+  renderWeek();
+}
+
+async function save(patch, up){
+  const wasKlaar = isKlaar(log, day);
+  const prev = log;
+  const next = {...log, ...patch};
+  next.klaar = isKlaar(next, day);
+  log = next; renderToday();
+  if (!await saveLog(next)){ log = prev; renderToday(); return false; }
+  if (next.klaar && !wasKlaar) showReward("Alles gedaan vandaag!", "Er komt een ster bij. Morgen weer!");
+  else if (up && !("water" in patch)) showReward(cheers[Math.floor(Math.random()*cheers.length)], "");
+  return true;
+}
+
+$("waterPlus").onclick = async () => {
+  const goal = waterGoal(), before = log.water||0, ml = before + GLAS;
+  if (!await save({water: ml}, true)) return;
+  if (before < goal && ml >= goal && !log.klaar) showReward("Fles vol!", `${fmtL(goal)} gedronken. Goed bezig!`);
+  else if (ml < goal){ const left = Math.ceil((goal-ml)/GLAS); toast(`Glas erbij! Nog ${left} te gaan`); }
+};
+$("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, false);
+
+// De iPhone-opdracht opent de app als ...#stappen1234. Tolerant voor "4,231" of "4231.0".
+async function syncSteps(){
+  const m = decodeURIComponent(location.hash).match(/^#stappen([\d.,\s]+)/i);
+  if (!m || !ready) return;
+  const n = parseInt(m[1].replace(/[.,]0+$/,"").replace(/\D/g,""), 10);
+  if (!n || log.stappen === n) return;
+  log = {...log, stappen: n}; renderToday();
+  await saveLog(log);
+}
+addEventListener("hashchange", syncSteps);
+
+function showReward(title, text){
+  const v = $("rewardVideo");
+  const pick = videos.length ? videos[Math.floor(Math.random()*videos.length)] : null;
+  $("rewardTitle").textContent = title;
+  $("rewardText").textContent = [text, pick?.van && `Filmpje van ${pick.van}`].filter(Boolean).join(" · ");
+  if (pick){ v.src = pick.url; v.hidden = false; v.play().catch(()=>{}); }
+  else v.hidden = true;
+  $("reward").hidden = false;
+  confetti();
+}
+$("rewardClose").onclick = () => { const v=$("rewardVideo"); v.pause(); v.removeAttribute("src"); $("reward").hidden = true; };
+
+function confetti(){
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c = $("confetti"), x = c.getContext("2d"); c.hidden=false;
+  c.width = innerWidth; c.height = innerHeight;
+  const cols = ["#F2B632","#2E8B57","#5FB3BD","#E0735F","#FFFFFF"];
+  const ps = Array.from({length:140},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,r:4+Math.random()*6,a:Math.random()*6,c:cols[Math.floor(Math.random()*cols.length)]}));
+  let f=0;
+  (function step(){
+    x.clearRect(0,0,c.width,c.height);
+    for (const p of ps){ p.x+=p.vx; p.y+=p.vy; p.a+=.1; x.fillStyle=p.c; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillRect(-p.r/2,-p.r/2,p.r,p.r*.6); x.restore(); }
+    if (++f<180) requestAnimationFrame(step); else { x.clearRect(0,0,c.width,c.height); c.hidden=true; }
+  })();
+}
+
+/* ---------- Instellen (alleen beheerder) ---------- */
+const weekLabel = w => w===0 ? "Voor OK" : "Week "+w;
+function renderSetup(){
+  if (!canSetup) return;
+  $("setName").value ||= settings.naam || "";
+  $("setOp").value ||= settings.operatie || "";
+  $("setWater").value ||= settings.water || "";
+  if (setupWeek == null) setupWeek = weekOf(day);
+
+  $("weeks").innerHTML = "";
+  for (let w=0; w<=MAXWEEK; w++){
+    const b = document.createElement("button");
+    b.textContent = weekLabel(w) + (w===weekOf(day) && settings.operatie ? " •" : "");
+    b.className = (w===setupWeek?"primary ":"") + (weken[w]?"has":"");
+    b.onclick = () => { setupWeek = w; resetForm(); renderSetup(); };
+    $("weeks").appendChild(b);
+  }
+  const own = weken[setupWeek], from = planWeek(setupWeek);
+  const el = $("weekTasks"); el.innerHTML = "";
+  if (!own){
+    $("weekInfo").textContent = from==null ? `${weekLabel(setupWeek)} heeft nog geen plan.` : `${weekLabel(setupWeek)} gebruikt nu het plan van ${weekLabel(from).toLowerCase()}. Voeg iets toe om een eigen plan voor deze week te maken.`;
+    if (from != null){
+      const b = document.createElement("button"); b.textContent = `Kopieer ${weekLabel(from).toLowerCase()} en pas aan`;
+      b.onclick = () => writeWeek(setupWeek, weken[from].map(t=>({...t})));
+      el.appendChild(b);
+    }
+  } else $("weekInfo").textContent = own.length ? "" : "Deze week alleen drinken.";
+  for (const t of own || []){
+    const r = document.createElement("div"); r.className="item";
+    r.innerHTML = `<div><b>${esc(t.naam)}</b><small>${t.keer}× per dag${t.uitleg?" · "+esc(t.uitleg):""}</small></div><div><button class="link">Wijzigen</button><button class="link danger">Verwijderen</button></div>`;
+    const [edit, del] = r.querySelectorAll("button");
+    edit.onclick = () => startEdit(t);
+    del.onclick = () => confirmDelete(del, () => writeWeek(setupWeek, own.filter(x=>x.id!==t.id)));
+    el.appendChild(r);
+  }
+  if (own && setupWeek>0){
+    const r = document.createElement("div"); r.className="item";
+    r.innerHTML = `<span class="note">Eigen plan weghalen, dan geldt weer de week ervoor.</span><button class="link danger">Plan weghalen</button>`;
+    const b = r.querySelector("button");
+    b.onclick = () => confirmDelete(b, async () => { await sb.from("weken").delete().eq("week", setupWeek); await loadAll(); });
+    el.appendChild(r);
+  }
+
+  const ve = $("videos");
+  ve.innerHTML = videos.length ? "" : '<p class="note">Nog geen filmpjes. Zonder filmpje krijgt hij confetti.</p>';
+  for (const v of videos){
+    const r = document.createElement("div"); r.className="item";
+    r.innerHTML = `<div><b>${esc(v.titel)}</b>${v.van?`<small>van ${esc(v.van)}</small>`:""}</div><div><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
+    const [view, del] = r.querySelectorAll("button");
+    view.onclick = () => { const vid=$("rewardVideo"); $("rewardTitle").textContent=v.titel; $("rewardText").textContent=""; vid.src=v.url; vid.hidden=false; $("reward").hidden=false; vid.play().catch(()=>{}); };
+    del.onclick = () => confirmDelete(del, async () => {
+      await sb.from("filmpjes").delete().eq("id", v.id);
+      await sb.storage.from("filmpjes").remove([v.pad]);
+      await loadAll();
+    });
+    ve.appendChild(r);
+  }
+
+  const rolNaam = {beheer:"Beheer", deelnemer:"Afvinken", familie:"Filmpjes sturen"};
+  const pe = $("people"); pe.innerHTML = "";
+  for (const p of people){
+    const r = document.createElement("div"); r.className="item";
+    r.innerHTML = `<div><b>${esc(p.naam || p.email)}</b><small>${esc(p.email)} · ${rolNaam[p.rol]}</small></div>${p.rol==="beheer" ? "" : '<button class="link danger">Weghalen</button>'}`;
+    const del = r.querySelector("button");
+    if (del) del.onclick = () => confirmDelete(del, async () => { await sb.from("toegang").delete().eq("email", p.email); await loadAll(); });
+    pe.appendChild(r);
+  }
+}
+$("personForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const {error} = await sb.from("toegang").upsert({ naam:$("pName").value.trim(), email:$("pEmail").value.trim().toLowerCase(), rol:$("pRol").value });
+  if (error){ toast("Toevoegen lukte niet"); return; }
+  $("personForm").reset(); toast("Toegevoegd. Stuur ze de link: ze maken zelf een account met dit e-mailadres.");
+  await loadAll();
+});
+async function writeWeek(w, oefeningen){
+  const {error} = await sb.from("weken").upsert({week: w, oefeningen});
+  if (error) toast("Opslaan lukte niet"); else await loadAll();
+}
+function confirmDelete(btn, fn){
+  if (btn.dataset.sure){ fn().catch(()=>toast("Verwijderen lukte niet")); return; }
+  const label = btn.textContent; btn.dataset.sure = "1"; btn.textContent = "Zeker weten?";
+  setTimeout(()=>{ delete btn.dataset.sure; btn.textContent=label; }, 3000);
+}
+function startEdit(t){
+  editing = t.id;
+  $("fName").value=t.naam; $("fNote").value=t.uitleg||""; $("fTimes").value=t.keer;
+  $("formTitle").textContent="Oefening wijzigen"; $("fSubmit").textContent="Opslaan"; $("fCancel").hidden=false;
+  $("fName").focus();
+}
+function resetForm(){ editing=null; $("taskForm").reset(); $("fTimes").value=1; $("formTitle").textContent="Oefening toevoegen"; $("fSubmit").textContent="Toevoegen"; $("fCancel").hidden=true; }
+$("fCancel").onclick = resetForm;
+$("taskForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const t = { id: editing || crypto.randomUUID().slice(0,8), naam:$("fName").value.trim(), uitleg:$("fNote").value.trim(), keer:Math.max(1,Math.min(10,+$("fTimes").value||1)) };
+  if (!t.naam) return;
+  // Nog geen eigen plan? Begin met een kopie van de week ervoor.
+  const from = planWeek(setupWeek);
+  const base = weken[setupWeek] || (from!=null ? weken[from] : []);
+  await writeWeek(setupWeek, editing ? base.map(x => x.id===editing ? t : x) : [...base, t]);
+  resetForm();
+});
+$("saveSettings").onclick = async () => {
+  const water = +$("setWater").value;
+  const {error} = await sb.from("instellingen").upsert({ id:1, naam:$("setName").value.trim(), operatie:$("setOp").value || null, water: water>=0.5 ? water : 2 });
+  if (error){ $("saveSettings").textContent="Lukte niet"; return; }
+  $("saveSettings").textContent="Opgeslagen"; setTimeout(()=>$("saveSettings").textContent="Opslaan",1500);
+  await loadAll();
+};
+/* ---------- Filmpjes verkleinen en uploaden ---------- */
+const MAX_MB = 50, MAX_SEC = 180;
+// Opnieuw opnemen via canvas + MediaRecorder: korte zijde 720 px, ~1,5 Mbit/s. Duurt even lang als het filmpje.
+// ponytail: realtime hercoderen; WebCodecs + muxer is sneller als wachten echt stoort.
+// H.264 + AAC eerst: dat speelt elke iPhone af, ook als het van Android komt.
+const MP4 = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4"].find(t => window.MediaRecorder?.isTypeSupported?.(t));
+let enc = null; // één video-element + AudioContext, ontgrendeld door de tik op Versturen
+function unlockEncoder(){
+  if (enc || !MP4 || !HTMLCanvasElement.prototype.captureStream) return;
+  const v = document.createElement("video"); v.playsInline = true;
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  const dest = ac.createMediaStreamDestination();
+  ac.createMediaElementSource(v).connect(dest); // niet naar de speakers: verkleinen gebeurt stil
+  enc = {v, ac, dest};
+  ac.resume();
+}
+async function verklein(file, onProgress){
+  if (!enc) return file;
+  const {v, ac, dest} = enc, url = URL.createObjectURL(file);
+  try {
+    v.src = url;
+    await new Promise((ok, err) => { v.onloadedmetadata = ok; v.onerror = err; });
+    if (v.duration > MAX_SEC) throw new Error("te lang");
+    const scale = Math.min(1, 720 / Math.min(v.videoWidth, v.videoHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(v.videoWidth*scale/2)*2; c.height = Math.round(v.videoHeight*scale/2)*2;
+    const ctx = c.getContext("2d");
+    const stream = c.captureStream(30);
+    dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+    const rec = new MediaRecorder(stream, {mimeType: MP4, videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000});
+    const chunks = []; rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    const stopped = new Promise(ok => rec.onstop = ok);
+    let raf; const draw = () => { ctx.drawImage(v, 0, 0, c.width, c.height); onProgress(v.currentTime / v.duration); raf = requestAnimationFrame(draw); };
+    v.currentTime = 0; await ac.resume();
+    rec.start(1000); await v.play(); draw();
+    await new Promise(ok => v.onended = ok);
+    cancelAnimationFrame(raf); rec.stop(); await stopped;
+    stream.getVideoTracks().forEach(t => t.stop());
+    const out = new Blob(chunks, {type: "video/mp4"});
+    return out.size > 0 && out.size < file.size ? out : file;
+  } catch(e){
+    if (e.message === "te lang") throw e;
+    return file; // verkleinen lukt niet op dit toestel: dan het origineel
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// Zelfde upload voor jou (Instellen) en de zussen (Stuur een filmpje).
+for (const box of document.querySelectorAll(".uploader")){
+  const inp = box.querySelector(".upload"), send = box.querySelector(".send"), msg = box.querySelector(".uploadMsg");
+  inp.onchange = () => {
+    const n = inp.files.length;
+    send.hidden = !n; send.textContent = n > 1 ? `Verstuur ${n} filmpjes` : "Versturen";
+    msg.textContent = n ? "Tik op Versturen. Laat daarna het scherm aan tot het klaar is." : "";
+  };
+  send.onclick = async () => {
+    unlockEncoder(); // moet direct in de tik gebeuren, anders geen geluid op de iPhone
+    const lock = await navigator.wakeLock?.request("screen").catch(() => null);
+    send.disabled = inp.disabled = true;
+    let ok = 0;
+    for (const [i, f] of [...inp.files].entries()){
+      const nr = inp.files.length > 1 ? ` (${i+1} van ${inp.files.length})` : "";
+      try {
+        const blob = await verklein(f, p => msg.textContent = `Verkleinen${nr}… ${Math.round(p*100)}%`);
+        if (blob.size > MAX_MB*1024*1024){ msg.textContent = `${f.name} is te groot (${Math.round(blob.size/1048576)} MB). Maak het filmpje korter.`; continue; }
+        msg.textContent = `Uploaden${nr}…`;
+        const ext = blob === f ? (f.name.split(".").pop() || "mp4").toLowerCase() : "mp4";
+        const pad = crypto.randomUUID() + "." + ext;
+        const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: blob.type || (ext==="mov" ? "video/quicktime" : "video/mp4")});
+        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: f.name.replace(/\.[^.]+$/,""), van: me.naam || null});
+        if (row.error) msg.textContent = `Uploaden van ${f.name} lukte niet. Probeer het nog eens.`; else ok++;
+      } catch {
+        msg.textContent = `${f.name} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
+      }
+    }
+    lock?.release();
+    if (ok) msg.textContent = ok > 1 ? `Gelukt! ${ok} filmpjes verstuurd. Dank je wel.` : "Gelukt! Dank je wel.";
+    inp.value = ""; send.hidden = true; send.disabled = inp.disabled = false;
+    await loadAll();
+  };
+}
+$("tabToday").onclick = () => show("today");
+$("tabSetup").onclick = () => show("setup");
+for (const b of document.querySelectorAll(".logout")) b.onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+/* ---------- Inloggen ---------- */
+// E-mail + wachtwoord, zonder bevestigingsmail. Toegang regelt de tabel "toegang", niet het account.
+const creds = () => ({ email: $("loginEmail").value.trim().toLowerCase(), password: $("loginPass").value });
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const {error} = await sb.auth.signInWithPassword(creds());
+  if (error) $("loginMsg").textContent = "E-mailadres of wachtwoord klopt niet. Eerste keer? Tik op Account maken.";
+});
+$("signup").onclick = async () => {
+  if (!$("loginForm").reportValidity()) return;
+  const {data, error} = await sb.auth.signUp(creds());
+  if (error) $("loginMsg").textContent = /registered/i.test(error.message) ? "Dit e-mailadres heeft al een account. Tik op Inloggen." : "Account maken lukte niet: " + error.message;
+  else if (!data.session) $("loginMsg").textContent = "Account gemaakt, maar Supabase vraagt nog om een bevestigingsmail. Zet 'Confirm email' uit (zie uitleg).";
+};
+
+let booted = false;
+async function boot(){
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session){ show("login"); return; }
+  if (booted) return; booted = true;
+  // Eigen rij (beheer ziet alle rijen, dus filteren op e-mail).
+  const {data: rij} = await sb.from("toegang").select().eq("email", session.user.email.toLowerCase()).maybeSingle();
+  if (!rij){
+    await sb.auth.signOut(); show("login");
+    $("loginMsg").textContent = `${session.user.email} heeft nog geen toegang. Vraag de beheerder om je toe te voegen.`;
+    booted = false; return;
+  }
+  me = rij;
+  canSetup = me.rol === "beheer";
+  $("tabs").hidden = !canSetup;
+  show(me.rol === "familie" ? "family" : "today");
+  await loadAll();
+}
+sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_IN") setTimeout(boot); });
+// Terugkomen in de app (of na middernacht): alles opnieuw ophalen.
+document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) loadAll(); });
+boot();
+</script>
+</body>
+</html>
