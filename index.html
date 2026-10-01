@@ -786,7 +786,7 @@ for (const box of document.querySelectorAll(".uploader")){
     let ok = 0;
     if (!items.length && txt){ // alleen tekst
       const {error} = await sb.from("filmpjes").insert({soort: "tekst", tekst: txt, titel: "Tekst", van: me.naam || null, voor: voor.value});
-      if (error) msg.textContent = "Versturen lukte niet. Probeer het nog eens."; else ok++;
+      if (error) msg.textContent = `Versturen lukte niet (${error.message}).`; else ok++;
     }
     for (const [i, it] of items.entries()){
       const f = it.file, nr = items.length > 1 ? ` (${i+1} van ${items.length})` : "";
@@ -801,7 +801,7 @@ for (const box of document.querySelectorAll(".uploader")){
         const pad = crypto.randomUUID() + "." + ext;
         const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: type});
         const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.naam, van: me.naam || null, soort, voor: voor.value, tekst: txt});
-        if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet. Probeer het nog eens.`; else ok++;
+        if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet (${row.error.message}).`; else ok++;
       } catch {
         msg.textContent = `${it.naam} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
       }
