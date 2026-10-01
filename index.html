@@ -54,6 +54,15 @@ button.link.danger{color:var(--danger)}
 .days div{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:14px;color:var(--muted)}
 .days svg{width:34px;height:34px}
 .days .today{color:var(--ink);font-weight:700}
+.moods{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.moods button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;font-weight:400;font-size:15px;border-color:var(--line);color:var(--ink)}
+.moods button span{font-size:34px;line-height:1}
+.moods button.on{border-color:var(--brand);background:var(--glass);font-weight:700}
+.hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
+.hday svg{width:24px;height:24px}
+.hday b{display:block}
+.hday small{color:var(--muted);font-size:15px;font-variant-numeric:tabular-nums}
+.hday .mood{font-size:28px;min-width:32px;text-align:center}
 .progress{height:14px;background:var(--line);border-radius:999px;overflow:hidden}
 .progress>div{height:100%;background:var(--done);transition:width .4s}
 .list{display:flex;flex-direction:column;gap:12px}
@@ -145,6 +154,11 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     </div>
 
     <div class="card">
+      <h3>Hoe voel je je vandaag?</h3>
+      <div class="moods" id="moods"></div>
+    </div>
+
+    <div class="card">
       <h3>Stappen</h3>
       <div class="big" id="stepsNum">–</div>
       <p id="stepsNote"></p>
@@ -177,6 +191,12 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     </div>
 
     <div class="list" id="tasks"></div>
+
+    <div class="card">
+      <h2>Terugkijken</h2>
+      <div class="weeks" id="histWeeks"></div>
+      <div id="histDays"></div>
+    </div>
   </section>
 
   <section id="viewSetup" class="view" hidden>
@@ -486,6 +506,51 @@ function renderToday(){
   $("bar").style.width = (done/total*100)+"%";
   $("progressText").textContent = done>=total ? "Alles gedaan vandaag!" : `${Math.round(done/total*100)}% van vandaag gedaan`;
   renderWeek();
+  renderMood();
+  renderHistory();
+}
+
+const GEVOEL = {1:["😣","Slecht"], 2:["😐","Matig"], 3:["🙂","Goed"], 4:["😄","Heel goed"]};
+const GEVOEL_REACTIE = {1:"Balen. Rustig aan vandaag, het mag.", 2:"Dank je. Elke dag een stapje.", 3:"Fijn om te horen!", 4:"Wat goed! Geniet ervan."};
+function renderMood(){
+  $("moods").innerHTML = "";
+  for (const [n, [emoji, label]] of Object.entries(GEVOEL)){
+    const b = document.createElement("button");
+    b.className = log.gevoel == n ? "on" : "";
+    b.setAttribute("aria-pressed", log.gevoel == n);
+    b.innerHTML = `<span aria-hidden="true">${emoji}</span>${label}`;
+    b.onclick = async () => { if (await save({gevoel: +n}, null)) toast(GEVOEL_REACTIE[n]); };
+    $("moods").appendChild(b);
+  }
+}
+
+// Terugkijken: alleen dagen tot en met vandaag, per herstelweek (of de laatste 14 dagen zonder operatiedatum).
+let histWeek = null;
+function renderHistory(){
+  const op = settings.operatie, nu = weekOf(day);
+  const byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
+  const weeks = op ? Array.from({length: nu+1}, (_,w) => w) : [null];
+  if (histWeek == null || !weeks.includes(histWeek)) histWeek = weeks.at(-1);
+  $("histWeeks").innerHTML = "";
+  if (op) for (const w of weeks){
+    const b = document.createElement("button");
+    b.textContent = w === 0 ? "Voor OK" : "Week " + w;
+    b.className = w === histWeek ? "primary" : "has";
+    b.onclick = () => { histWeek = w; renderHistory(); };
+    $("histWeeks").appendChild(b);
+  }
+  const start = !op ? addDays(day, -13) : histWeek === 0 ? addDays(op, -7) : addDays(op, (histWeek-1)*7);
+  const days = Array.from({length: op ? 7 : 14}, (_,i) => addDays(start, i)).filter(d => d <= day).reverse();
+  const nl = n => n.toLocaleString("nl-NL");
+  $("histDays").innerHTML = days.map(d => {
+    const l = d === day ? log : byDate[d] || {};
+    const ts = tasksFor(d), tot = ts.reduce((a,t) => a+t.keer, 0), done = ts.reduce((a,t) => a + Math.min(l[t.id]||0, t.keer), 0);
+    const klaar = d === day ? isKlaar(log, day) : !!l.klaar;
+    const stats = [tot ? `Oefeningen ${done}/${tot}` : "", `Water ${fmtL(l.water||0)}`, l.stappen ? `${nl(l.stappen)} stappen` : ""].filter(Boolean).join(" · ");
+    const naam = d === day ? "Vandaag" : new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"});
+    const g = GEVOEL[l.gevoel];
+    return `<div class="hday"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
+  }).join("") || '<p class="note">Nog niets om terug te kijken.</p>';
 }
 
 // reward = {cat, title?, text?} of null. De beloning start meteen, nog binnen de tik:
