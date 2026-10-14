@@ -109,6 +109,14 @@ details.group>summary{cursor:pointer;font-weight:700;font-size:17px;padding-bloc
 label.pick{font-size:19px;padding:14px 20px;width:100%}
 details.opties>summary{cursor:pointer;font-weight:700;font-size:16px}
 .mrow>label:first-child{flex:0 1 90px}
+.prow{display:grid;grid-template-columns:64px 1fr 1fr 1fr;gap:6px;align-items:center;border-top:1px solid var(--line);padding-block:6px}
+.prow input{padding:6px 8px;font-size:16px}
+.pdate{display:flex;flex-direction:column;line-height:1.2}
+.pdate small,.pdate .nu{color:var(--muted);font-size:13px}
+.pdate .nu{color:var(--brand);font-weight:700}
+.prow.past{grid-template-columns:64px 1fr}
+.prow.past small{color:var(--muted);font-size:15px;line-height:1.4}
+@media (max-width:560px){.prow{grid-template-columns:64px 1fr}.prow .pc,.prow .po{grid-column:2}}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -175,6 +183,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     <div class="tabs" id="tabs" hidden>
       <button id="tabToday" class="primary">Vandaag</button>
       <button id="tabMsgs">Berichtjes</button>
+      <button id="tabPlan">Plannen</button>
       <button id="tabSetup">Instellen</button>
     </div>
   </header>
@@ -298,29 +307,6 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     </details>
 
     <details class="card">
-      <summary><h2>Woord van de dag</h2></summary>
-      <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij één woord, in 6 pogingen. Zet hieronder <b>één woord per regel</b>, in de volgorde waarin hij ze krijgt. Woorden van 3 tot 10 letters. Wil je een kruiswoord-omschrijving erbij? Zet die achter een =, bijvoorbeeld <b>TAART = Zoet gebak op een verjaardag</b>.</p>
-      <label>De woorden<textarea id="setPuzzel" rows="10"></textarea></label>
-      <p class="note" id="woordStand"></p>
-      <button class="primary" id="savePuzzel">Woorden opslaan</button>
-    </details>
-
-    <details class="card">
-      <summary><h2>Foto-opdrachten</h2></summary>
-      <p>Zet in het plan een onderdeel met soort <b>Foto-opdracht</b>. Elke dag krijgt hij de volgende opdracht: "Maak een foto van …". Eén opdracht per regel.</p>
-      <label>De opdrachten<textarea id="setOpdrachten" rows="10"></textarea></label>
-      <p class="note" id="opdrachtStand"></p>
-      <button class="primary" id="saveOpdrachten">Opdrachten opslaan</button>
-    </details>
-
-    <details class="card">
-      <summary><h2>Smileys</h2></summary>
-      <p>De vier knoppen bij "Hoe voel je je vandaag?" en wat hij te lezen krijgt als hij erop tikt.</p>
-      <div id="moodSetup"></div>
-      <button class="primary" id="saveMood">Smileys opslaan</button>
-    </details>
-
-    <details class="card">
       <summary><h2>Wie mag erin?</h2></summary>
       <p><b>Alles, net als jij</b>: kan ook instellen. <b>Berichtjes sturen</b>: alleen berichtjes, meekijken en afvinken. <b>Afvinken</b>: papa. Voeg iemand toe en tik daarna op <b>Uitnodiging kopiëren</b>: je krijgt een kant-en-klaar berichtje met de link en de stappen, om in WhatsApp te plakken.</p>
       <div id="people"></div>
@@ -336,6 +322,23 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
       </form>
     </details>
 
+    <button class="link logout">Uitloggen</button>
+  </section>
+
+  <section id="viewPlan" class="view" hidden>
+    <div class="card">
+      <h2>Woord en foto per dag</h2>
+      <p>Per dag het woord dat hij moet raden (3 tot 10 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
+      <div class="row"><button type="button" id="planFill">Vul lege dagen met suggesties</button><span class="note">voor de komende 3 weken</span></div>
+      <div id="planRows"></div>
+      <details class="group" id="planPast"><summary>Geweest</summary><div id="planPastRows"></div></details>
+    </div>
+    <div class="card">
+      <h2>Smileys</h2>
+      <p>De vier knoppen bij "Hoe voel je je vandaag?" en wat hij te lezen krijgt als hij erop tikt.</p>
+      <div id="moodSetup"></div>
+      <button class="primary" id="saveMood">Smileys opslaan</button>
+    </div>
     <button class="link logout">Uitloggen</button>
   </section>
 
@@ -423,15 +426,17 @@ function waterGoal(){ return Math.round((+settings.water || 2) * 1000); }
 // Week 0 = voor de operatie, week 1 = dag 0–6 na de operatie, enz.
 function weekOf(date){ if (!settings.operatie) return 1; const n = diffDays(date, settings.operatie); return n < 0 ? 0 : Math.min(MAXWEEK, Math.floor(n/7)+1); }
 function planWeek(w){ for (let i=w; i>=0; i--) if (weken[i]) return i; return null; }
-function tasksFor(date){ const w = planWeek(weekOf(date)); return w==null ? [] : weken[w]; }
+// Woord van de dag en foto-opdracht tellen alleen mee op dagen waarvoor iets is ingepland.
+function tasksFor(date){ const w = planWeek(weekOf(date)); return w==null ? [] : weken[w].filter(t => (catOf(t) !== "puzzel" || geldigWoord(date)) && (catOf(t) !== "foto" || planVan(date).opdracht)); }
 function isKlaar(l, date){ return tasksFor(date).every(t => (l[t.id]||0) >= t.keer) && (l.water||0) >= waterGoal(); }
 const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) + " L";
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
 function show(which){
-  for (const v of ["Login","Today","Setup","Family"]) $("view"+v).hidden = v.toLowerCase()!==which;
-  $("tabToday").className = which==="today"?"primary":""; $("tabMsgs").className = which==="family"?"primary":""; $("tabSetup").className = which==="setup"?"primary":"";
+  for (const v of ["Login","Today","Setup","Family","Plan"]) $("view"+v).hidden = v.toLowerCase()!==which;
+  for (const [id, v] of [["tabToday","today"],["tabMsgs","family"],["tabPlan","plan"],["tabSetup","setup"]]) $(id).className = which===v ? "primary" : "";
   if (which==="setup") renderSetup();
   if (which==="family") renderMsgs();
+  if (which==="plan") renderPlan();
 }
 
 /* ---------- Gegevens ---------- */
@@ -446,14 +451,16 @@ function goDay(d){
 async function loadAll(){
   day = viewDay || iso(new Date());
   // ponytail: 150 dagen terug dekt 2 weken voor de OK + 16 herstelweken; ruimer ophalen als het plan langer wordt.
-  const [s, w, f, l, p] = await Promise.all([
+  const [s, w, f, l, p, dp] = await Promise.all([
     sb.from("instellingen").select().eq("id", 1).maybeSingle(),
     sb.from("weken").select(),
     sb.from("filmpjes").select().order("gemaakt"),
     sb.from("log").select().gte("datum", addDays(day, -150)),
     canSetup ? sb.from("toegang").select().order("rol") : {data: []},
+    sb.from("dagplan").select().gte("datum", addDays(day, -150)),
   ]);
-  if (s.error || w.error || f.error || l.error || p.error){ toast("Laden lukte niet. Controleer je internet."); return; }
+  if (s.error || w.error || f.error || l.error || p.error || dp.error){ toast("Laden lukte niet. Controleer je internet."); return; }
+  dagplan = {}; for (const r of dp.data) dagplan[r.datum] = r;
   settings = s.data || {};
   people = p.data;
   weken = {}; for (const r of w.data) weken[r.week] = r.oefeningen || [];
@@ -476,6 +483,7 @@ async function loadAll(){
   ready = true;
   renderHeader(); renderToday(); if (!$("viewSetup").hidden) renderSetup();
   if (!$("viewFamily").hidden) renderMsgs();
+  if (!$("viewPlan").hidden) renderPlan();
   syncSteps();
   greet();
 }
@@ -700,10 +708,10 @@ function renderHistory(){
 }
 
 /* ---------- Foto-opdracht: elke dag "maak een foto van ..." ---------- */
-const OPDRACHTEN = "iets groens\nje ontbijt\nhet uitzicht uit je raam\niets waar je om moet glimlachen\nje favoriete mok\nje sloffen\niets ronds\nwat je nu aan het lezen bent\nde lucht van vandaag\niets ouds in huis met een verhaal\nje duim omhoog\niets roods\nde plek waar je het liefst zit\neen selfie met je beste glimlach";
-const opdrachten = () => (settings.opdrachten || OPDRACHTEN).split(/\n+/).map(x => x.trim()).filter(Boolean);
-const opdrachtNr = () => recent.filter(r => r.datum < day && r.foto).length;
-const opdrachtVanDaag = () => { const o = opdrachten(); return o[opdrachtNr() % o.length]; };
+const OPDRACHTEN_SUG = "iets groens\nje ontbijt\nhet uitzicht uit je raam\niets waar je om moet glimlachen\nje favoriete mok\nje sloffen\niets ronds\nwat je nu aan het lezen bent\nde lucht van vandaag\niets ouds in huis met een verhaal\nje duim omhoog\niets roods\nde plek waar je het liefst zit\neen selfie met je beste glimlach";
+let dagplan = {}; // datum -> {woord, omschrijving, opdracht}, ingevuld door de familie onder Plannen
+const planVan = d => dagplan[d] || {};
+const opdrachtVanDaag = () => planVan(day).opdracht || "";
 let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
 function renderFotoOpdracht(t){
   const card = document.createElement("div");
@@ -739,19 +747,13 @@ function renderAlbum(){
 }
 
 /* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
-const WOORDEN = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAARS\nHAVEN\nZWAAN\nBROOD\nPAARD\nSCHIP";
+const WOORDEN_SUG = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAARS\nHAVEN\nZWAAN\nBROOD\nPAARD\nSCHIP";
 const POGINGEN = 6;
 const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-// Eén per regel: "WOORD" of "WOORD = omschrijving" (een dubbele punt mag ook).
-const woordItems = () => (settings.puzzel || WOORDEN).split(/\n+/).map(regel => {
-  const [w, ...rest] = regel.split(/[=:]/);
-  return {w: norm(w).replace(/[^A-Z]/g, ""), clue: rest.join(":").trim()};
-}).filter(x => x.w.length >= 3 && x.w.length <= 10);
-const woordenlijst = () => woordItems().map(x => x.w);
-const woordNr = () => recent.filter(r => r.datum < day && r.puzzel).length;
-// Welk woord vandaag: telt door op gespeelde dagen, dus een dag overslaan = gewoon het volgende woord.
-const woordVanDaag = () => { const ws = woordenlijst(); return ws[woordNr() % ws.length]; };
-const clueVanDaag = () => { const it = woordItems(); return it[woordNr() % it.length]?.clue || ""; };
+const woordOp = d => norm(planVan(d).woord || "").replace(/[^A-Z]/g, "");
+const geldigWoord = d => woordOp(d).length >= 3 && woordOp(d).length <= 10;
+const woordVanDaag = () => woordOp(day);
+const clueVanDaag = () => planVan(day).omschrijving || "";
 // Per letter: "goed" (juiste plek), "bijna" (zit erin, andere plek) of "mis". Dubbele letters tellen niet dubbel.
 function score(gok, woord){
   const n = woord.length, uit = Array(n).fill("mis"), over = {};
@@ -905,12 +907,7 @@ function renderSetup(){
   $("setName").value ||= settings.naam || "";
   $("setOp").value ||= settings.operatie || "";
   $("setWater").value ||= settings.water || "";
-  $("setPuzzel").value ||= settings.puzzel || WOORDEN;
-  $("setOpdrachten").value ||= settings.opdrachten || OPDRACHTEN;
-  { const o = opdrachten(), i = opdrachtNr(); $("opdrachtStand").textContent = `${o.length} opdrachten. Hij is bij opdracht ${i % o.length + 1}: ${o[i % o.length] || "-"}${i >= o.length ? " (de lijst begint opnieuw)" : ""}.`; }
-  { const ws = woordenlijst(), i = woordNr(); $("woordStand").textContent = `${ws.length} woorden. Hij is bij woord ${i % ws.length + 1}: ${ws[i % ws.length] || "-"}${i >= ws.length ? " (de lijst begint opnieuw, zet er meer woorden bij)" : ""}.`; }
   if (setupWeek == null) setupWeek = weekOf(day);
-  if (!$("moodSetup").children.length) $("moodSetup").innerHTML = Object.entries(gevoel()).map(([n, g]) => `<div class="row mrow" data-n="${n}"><label>Smiley<input class="me" maxlength="4" value="${esc(g.e)}"></label><label>Naam<input class="ml" maxlength="20" value="${esc(g.l)}"></label><label>Wat hij dan leest<input class="mr" maxlength="120" value="${esc(g.r)}"></label></div>`).join("");
 
   $("weeks").innerHTML = "";
   for (let w=0; w<=MAXWEEK; w++){
@@ -984,13 +981,13 @@ function renderMsgs(){
 }
 function msgRow(v){
   const r = document.createElement("div"); r.className = "item msg";
-  const kop = v.soort === "tekst" ? v.tekst.slice(0, 70) + (v.tekst.length > 70 ? "…" : "") : v.titel;
+  const kop = v.soort === "tekst" ? v.tekst.slice(0, 70) + (v.tekst.length > 70 ? "…" : "") : (v.tekst || v.titel || `${SOORT[v.soort] || "Filmpje"}${v.van ? " van " + v.van : ""}`);
   const datum = v.gemaakt ? new Date(v.gemaakt).toLocaleDateString("nl-NL", {day: "numeric", month: "short"}) : "";
   const thumb = v.soort === "foto" ? `<img src="${v.url}" alt="" loading="lazy">` : `<span class="ico" aria-hidden="true">${ICO[v.soort] || ICO.video}</span>`;
   const info = [SOORT[v.soort] || "Filmpje", v.van && `van ${esc(v.van)}`, v.tekst && v.soort !== "tekst" && "met tekst", v.week != null && (v.week === 0 ? "voor de OK" : "week " + v.week), datum].filter(Boolean).join(" · ");
   r.innerHTML = `${thumb}<div class="grow"><b>${esc(kop)}</b><small>${info}</small></div><div class="acts">${canSetup ? `<select class="mv" aria-label="Moment">${voorOptions(v.voor)}</select><select class="wk" aria-label="Week">${weekOptions(v.week)}</select>` : ""}<button class="link">Bekijken</button>${canSetup ? '<button class="link danger">Verwijderen</button>' : ""}</div>`;
   const [view, del] = r.querySelectorAll("button");
-  view.onclick = () => showMedia(v.titel, v);
+  view.onclick = () => showMedia(v.soort === "tekst" ? "" : SOORT[v.soort] || "", v);
   if (!canSetup) return r;
   const mv = r.querySelector(".mv"), wk = r.querySelector(".wk");
   mv.onchange = async () => { const {error} = await sb.from("filmpjes").update({voor: mv.value}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else { v.voor = mv.value; renderMsgs(); } };
@@ -1002,6 +999,46 @@ function msgRow(v){
   });
   return r;
 }
+/* ---------- Plannen: woord en foto-opdracht per dag ---------- */
+const WS = WOORDEN_SUG.split("\n"), OS = OPDRACHTEN_SUG.split("\n");
+const dagLabel = d => { const x = new Date(d+"T12:00"); return `<b>${x.toLocaleDateString("nl-NL",{weekday:"short"})}</b><small>${x.toLocaleDateString("nl-NL",{day:"numeric",month:"short"})}</small>`; };
+function renderPlan(){
+  const vandaag = iso(new Date()), byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
+  const komend = Array.from({length: 21}, (_, i) => addDays(vandaag, i));
+  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="12" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
+  $("planRows").onchange = e => { const r = e.target.closest(".prow"); if (r) bewaarDag(r.dataset.d, r.querySelector(".pw").value, r.querySelector(".pc").value, r.querySelector(".po").value); };
+  // Geweest: wat er gepland was en hoe het ging, nieuwste bovenaan.
+  const geweest = Array.from({length: 30}, (_, i) => addDays(vandaag, -1 - i)).filter(d => dagplan[d] || byDate[d]?.puzzel || byDate[d]?.foto);
+  $("planPast").hidden = !geweest.length;
+  $("planPastRows").innerHTML = geweest.map(d => {
+    const pl = planVan(d), l = byDate[d] || {};
+    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
+    const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
+    return `<div class="prow past"><div class="pdate">${dagLabel(d)}</div><div class="grow"><small>${[w, o].filter(Boolean).join("<br>")}</small></div></div>`;
+  }).join("");
+  if (!$("moodSetup").children.length) $("moodSetup").innerHTML = Object.entries(gevoel()).map(([n, g]) => `<div class="row mrow" data-n="${n}"><label>Smiley<input class="me" maxlength="4" value="${esc(g.e)}"></label><label>Naam<input class="ml" maxlength="20" value="${esc(g.l)}"></label><label>Wat hij dan leest<input class="mr" maxlength="120" value="${esc(g.r)}"></label></div>`).join("");
+}
+async function bewaarDag(datum, woord, omschrijving, opdracht){
+  const w = woord.trim(), n = norm(w).replace(/[^A-Z]/g, "").length;
+  if (w && (n < 3 || n > 10)){ toast("Een woord heeft 3 tot 10 letters"); return; }
+  const rij = {datum, woord: w || null, omschrijving: omschrijving.trim() || null, opdracht: opdracht.trim() || null};
+  const {error} = await sb.from("dagplan").upsert(rij);
+  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
+  dagplan[datum] = rij;
+}
+$("planFill").onclick = async () => {
+  const vandaag = iso(new Date()), rijen = [];
+  for (let i = 0; i < 21; i++){
+    const d = addDays(vandaag, i), pl = planVan(d);
+    if (pl.woord && pl.opdracht) continue;
+    rijen.push({datum: d, woord: pl.woord || WS[i % WS.length], omschrijving: pl.omschrijving || null, opdracht: pl.opdracht || OS[i % OS.length]});
+  }
+  if (!rijen.length){ toast("Alle dagen zijn al ingevuld"); return; }
+  const {error} = await sb.from("dagplan").upsert(rijen);
+  if (error){ toast("Vullen lukte niet: " + error.message); return; }
+  for (const r of rijen) dagplan[r.datum] = r;
+  toast(`${rijen.length} dagen ingevuld`); renderPlan();
+};
 // Kant-en-klaar WhatsApp-berichtje met de link en de stappen.
 function uitnodiging(p){
   const link = location.origin + location.pathname;
@@ -1060,24 +1097,12 @@ $("taskForm").addEventListener("submit", async e => {
   await writeWeek(setupWeek, editing ? base.map(x => x.id===editing ? t : x) : [...base, t]);
   resetForm();
 });
-$("saveOpdrachten").onclick = async () => {
-  const tekst = $("setOpdrachten").value.trim();
-  const {error} = await sb.from("instellingen").update({ opdrachten: tekst === OPDRACHTEN ? null : tekst || null }).eq("id", 1);
-  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
-  toast("Opdrachten opgeslagen"); await loadAll();
-};
 $("saveMood").onclick = async () => {
   const gevoel = {};
   for (const row of $("moodSetup").querySelectorAll(".mrow")) gevoel[row.dataset.n] = { e: row.querySelector(".me").value.trim() || GEVOEL_STD[row.dataset.n].e, l: row.querySelector(".ml").value.trim() || GEVOEL_STD[row.dataset.n].l, r: row.querySelector(".mr").value.trim() };
   const {error} = await sb.from("instellingen").update({gevoel}).eq("id", 1);
   if (error){ toast("Opslaan lukte niet: " + error.message); return; }
   toast("Smileys opgeslagen"); await loadAll();
-};
-$("savePuzzel").onclick = async () => {
-  const tekst = $("setPuzzel").value.trim();
-  const {error} = await sb.from("instellingen").update({ puzzel: tekst === WOORDEN ? null : tekst || null }).eq("id", 1);
-  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
-  toast("Woorden opgeslagen"); await loadAll();
 };
 $("saveSettings").onclick = async () => {
   const water = +$("setWater").value;
@@ -1238,7 +1263,7 @@ for (const box of document.querySelectorAll(".uploader")){
         const ext = {"video/mp4":"mp4","video/quicktime":"mov","image/jpeg":"jpg","image/png":"png","image/heic":"heic","audio/mp4":"m4a","audio/x-m4a":"m4a","audio/mpeg":"mp3","audio/webm":"webm"}[type] || (f.name?.split(".").pop() || "bin").toLowerCase();
         const pad = crypto.randomUUID() + "." + ext;
         const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: type});
-        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.naam, van: me.naam || null, soort, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value, tekst: txt});
+        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.audio ? it.naam : null, van: me.naam || null, soort, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value, tekst: txt});
         if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet (${row.error.message}).`; else ok++;
       } catch {
         msg.textContent = `${it.naam} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
@@ -1254,6 +1279,7 @@ for (const box of document.querySelectorAll(".uploader")){
 $("tabToday").onclick = () => show("today");
 $("backToday").onclick = () => goDay(iso(new Date()));
 $("tabMsgs").onclick = () => show("family");
+$("tabPlan").onclick = () => show("plan");
 $("tabSetup").onclick = () => show("setup");
 for (const b of document.querySelectorAll(".logout")) b.onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
