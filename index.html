@@ -108,11 +108,6 @@ label.big{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .big small{font:400 18px var(--font);color:var(--muted)}
 .waterbtns{display:flex;gap:10px;flex-wrap:wrap}
 .waterbtns .primary{font-size:20px;padding:12px 18px;background:var(--water);border-color:var(--water);color:#fff}
-.chart{width:100%;height:auto;display:block;touch-action:manipulation}
-.chart text{fill:var(--muted);font:12px var(--font);font-variant-numeric:tabular-nums}
-.chart .hit{fill:transparent;cursor:pointer}
-.chart .bar.sel{fill:var(--sun)}
-#stepsReadout{min-height:1.5em;font-variant-numeric:tabular-nums}
 .uploader{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .empty{background:var(--card);border:2px dashed var(--line);border-radius:16px;padding:20px;color:var(--muted)}
 form{display:flex;flex-direction:column;gap:12px}
@@ -196,16 +191,6 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     <div class="card">
       <h3>Hoe voel je je vandaag?</h3>
       <div class="moods" id="moods"></div>
-    </div>
-
-    <div class="card">
-      <h3>Stappen</h3>
-      <div class="big" id="stepsNum">–</div>
-      <p id="stepsNote"></p>
-      <div id="stepsChartBox" hidden>
-        <p id="stepsReadout" aria-live="polite"></p>
-        <svg class="chart" id="stepsChart" viewBox="0 0 360 160" role="img" aria-label="Stappen per dag, laatste 30 dagen"></svg>
-      </div>
     </div>
 
     <div class="card">
@@ -450,7 +435,6 @@ async function loadAll(){
   renderHeader(); renderToday(); if (!$("viewSetup").hidden) renderSetup();
   const mine = videos.filter(v => v.van === me.naam).length;
   $("familyCount").textContent = videos.length ? `Er staan ${videos.length} berichtjes klaar${mine ? `, waarvan ${mine} van jou` : ""}.` : "Er staan nog geen berichtjes klaar. Jij mag de eerste zijn!";
-  syncSteps();
   greet();
 }
 // Eerste keer openen op een dag: een goedemorgen-bericht, alleen voor papa.
@@ -526,53 +510,6 @@ function renderWeek(){
   $("streak").textContent = s>=2 ? `${s} dagen op rij alles af!` : s===1 ? "1 dag alles af" : "";
 }
 
-// Na de operatie: gemiddelde stappen per dag per herstelweek, met "Voor" (2 weken voor de OK) als ijkpunt.
-// Zonder (verstreken) operatiedatum: per dag, laatste 30 dagen. Tik op een staaf voor het getal.
-function renderStepsChart(){
-  const byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
-  const stepsOn = d => (d===day ? log : byDate[d])?.stappen || 0;
-  const nl = n => n.toLocaleString("nl-NL");
-  const fmtDay = d => new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"});
-  const avgOf = (from, n) => { const xs = Array.from({length:n}, (_,i) => addDays(from,i)).filter(d => d<=day).map(stepsOn).filter(v=>v); return xs.length ? Math.round(xs.reduce((a,b)=>a+b,0)/xs.length) : 0; };
-  let bars, title, ref = 0;
-  const op = settings.operatie;
-  if (op && op <= day){
-    bars = [{label:"Voor", v: avgOf(addDays(op,-14), 14), info:"2 weken voor de operatie"}];
-    for (let w=1; w<=weekOf(day); w++) bars.push({label:"W"+w, v: avgOf(addDays(op,(w-1)*7), 7), info:`Week ${w}`});
-    bars.forEach(b => b.text = `${b.info}: ${b.v ? "gemiddeld "+nl(b.v)+" stappen per dag" : "geen gegevens"}`);
-    ref = bars[0].v;
-    title = ref ? "Gemiddeld per dag, per week. Stippellijn = voor de operatie." : "Gemiddeld per dag, per week sinds de operatie.";
-  } else {
-    bars = Array.from({length:30}, (_,i) => { const d = addDays(day, i-29), v = stepsOn(d); return {label:"", d, v, text:`${fmtDay(d)}: ${v ? nl(v)+" stappen" : "geen gegevens"}`}; });
-    const xs = bars.map(b=>b.v).filter(v=>v);
-    title = xs.length ? `Gemiddeld ${nl(Math.round(xs.reduce((a,b)=>a+b,0)/xs.length))} per dag (laatste 30 dagen)` : "";
-  }
-  const filled = bars.filter(b => b.v).length;
-  $("stepsChartBox").hidden = filled < 2;
-  if (filled < 2) return;
-
-  const W=360, H=160, L=38, T=8, B=22, h=H-T-B, base=T+h, band=(W-L)/bars.length;
-  const max = Math.max(1000, Math.ceil(Math.max(...bars.map(b=>b.v))/1000)*1000);
-  const y = v => base - v/max*h;
-  let s = "";
-  for (const t of [0, max/2, max]) s += `<line x1="${L}" x2="${W}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${L-6}" y="${y(t)+4}" text-anchor="end">${t>=1000 ? (t/1000).toLocaleString("nl-NL")+"k" : t}</text>`;
-  if (ref) s += `<line x1="${L}" x2="${W}" y1="${y(ref)}" y2="${y(ref)}" stroke="var(--sun)" stroke-width="2" stroke-dasharray="4 4"/>`;
-  bars.forEach((b,i) => {
-    if (b.v){
-      const w = Math.min(28, band-2), x = L + i*band + (band-w)/2, top = y(b.v), r = Math.min(4, w/2, base-top);
-      s += `<path class="bar" data-i="${i}" fill="var(--brand)" d="M${x},${base}V${top+r}q0,-${r} ${r},-${r}h${w-2*r}q${r},0 ${r},${r}V${base}z"/>`;
-    }
-    // Weeklabels onder elke staaf, of om de week als het krap wordt.
-    if (b.label && (band >= 18 || i%2===0)) s += `<text x="${L+i*band+band/2}" y="${H-4}" text-anchor="middle">${b.label}</text>`;
-    s += `<rect class="hit" data-i="${i}" x="${L+i*band}" y="${T}" width="${band}" height="${h}"/>`;
-  });
-  if (!bars[0].label) s += `<text x="${L}" y="${H-4}">${fmtDay(bars[0].d)}</text><text x="${W}" y="${H-4}" text-anchor="end">vandaag</text>`;
-  const svg = $("stepsChart"); svg.innerHTML = s;
-  const select = i => { svg.querySelectorAll(".bar").forEach(el => el.classList.toggle("sel", el.dataset.i==i)); $("stepsReadout").textContent = i==null ? title : bars[i].text; };
-  svg.querySelectorAll(".hit").forEach(r => { r.onpointerenter = r.onclick = () => select(+r.dataset.i); });
-  svg.onpointerleave = e => { if (e.pointerType === "mouse") select(null); }; // op touch blijft de keuze staan
-  select(null);
-}
 
 function renderWater(){
   const goal = waterGoal(), ml = log.water||0, ticks = goal/GLAS;
@@ -589,9 +526,6 @@ function renderToday(){
   $("pastBanner").hidden = isToday();
   if (!isToday()) $("pastName").textContent = new Date(day+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"});
   renderWater();
-  $("stepsNum").textContent = log.stappen ? log.stappen.toLocaleString("nl-NL") : "–";
-  $("stepsNote").textContent = log.stappen ? "stappen vandaag, uit Gezondheid" : "Nog geen stappen vandaag.";
-  renderStepsChart();
   const list = tasksFor(day), el = $("tasks"); el.innerHTML = "";
   if (!list.length) el.innerHTML = '<div class="empty">Vandaag alleen drinken. Verder staat er niets op het plan.</div>';
   const goal = waterGoal();
@@ -654,12 +588,11 @@ function renderHistory(){
   }
   const start = !op ? addDays(day, -13) : histWeek === 0 ? addDays(op, -7) : addDays(op, (histWeek-1)*7);
   const days = Array.from({length: op ? 7 : 14}, (_,i) => addDays(start, i)).filter(d => d <= day).reverse();
-  const nl = n => n.toLocaleString("nl-NL");
   $("histDays").innerHTML = days.map(d => {
     const l = d === day ? log : byDate[d] || {};
     const ts = tasksFor(d), tot = ts.reduce((a,t) => a+t.keer, 0), done = ts.reduce((a,t) => a + Math.min(l[t.id]||0, t.keer), 0);
     const klaar = d === day ? isKlaar(log, day) : !!l.klaar;
-    const stats = [l.overleefd ? "🏅 Operatie overleefd" : "", tot ? `Oefeningen ${done}/${tot}` : "", `Water ${fmtL(l.water||0)}`, l.stappen ? `${nl(l.stappen)} stappen` : ""].filter(Boolean).join(" · ");
+    const stats = [l.overleefd ? "🏅 Operatie overleefd" : "", tot ? `Oefeningen ${done}/${tot}` : "", `Water ${fmtL(l.water||0)}`].filter(Boolean).join(" · ");
     const naam = d === iso(new Date()) ? "Vandaag" : new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"});
     const g = GEVOEL[l.gevoel];
     return `<div class="hday" role="button" tabindex="0" data-d="${d}"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
@@ -800,16 +733,6 @@ $("waterPlus").onclick = () => {
 };
 $("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, null);
 
-// De iPhone-opdracht opent de app als ...#stappen1234. Tolerant voor "4,231" of "4231.0".
-async function syncSteps(){
-  const m = decodeURIComponent(location.hash).match(/^#stappen([\d.,\s]+)/i);
-  if (!m || !ready || me.rol === "familie" || !isToday()) return;
-  const n = parseInt(m[1].replace(/[.,]0+$/,"").replace(/\D/g,""), 10);
-  if (!n || log.stappen === n) return;
-  log = {...log, stappen: n}; renderToday();
-  await saveLog(log);
-}
-addEventListener("hashchange", syncSteps);
 
 function showReward(title, text, cat, party = true){
   const m = pickMedia(cat);
