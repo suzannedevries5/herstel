@@ -88,6 +88,8 @@ label.big{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .album button{display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:none;color:var(--ink);font-weight:400;text-align:left}
 .album img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;background:var(--glass)}
 .album small{color:var(--muted);font-size:14px;line-height:1.3}
+.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
+.steps li{padding-left:4px}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -159,7 +161,8 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
   <section id="viewLogin" class="view" hidden>
     <div class="card">
-      <h2>Inloggen</h2>
+      <h2>Welkom bij Papa's Herstelplan</h2>
+      <p><b>Eerste keer hier?</b> Vul het e-mailadres in dat Suzanne heeft doorgegeven, kies zelf een wachtwoord en tik op <b>Account maken</b>. Daarna log je met datzelfde adres en wachtwoord in.</p>
       <form id="loginForm">
         <label>E-mailadres<input id="loginEmail" type="email" autocomplete="email" required></label>
         <label>Wachtwoord<input id="loginPass" type="password" autocomplete="current-password" minlength="8" required></label>
@@ -299,7 +302,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
     <div class="card">
       <h2>Wie mag erin?</h2>
-      <p><b>Afvinken</b>: ziet alleen het plan van vandaag. <b>Berichtjes sturen</b>: kan filmpjes, foto's en spraakberichten sturen, en meekijken en afvinken bij Vandaag. Ze openen de link, tikken op <b>Account maken</b> en kiezen zelf een wachtwoord, met precies het e-mailadres dat je hier invult.</p>
+      <p><b>Afvinken</b>: papa. <b>Berichtjes sturen</b>: de zussen, die kunnen ook meekijken en afvinken. Voeg iemand toe en tik daarna op <b>Uitnodiging kopiëren</b>: je krijgt een kant-en-klaar berichtje met de link en de stappen, om in WhatsApp te plakken.</p>
       <div id="people"></div>
       <form id="personForm">
         <div class="row">
@@ -319,7 +322,12 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   <section id="viewFamily" class="view" hidden>
     <div class="card">
       <h2>Stuur een berichtje</h2>
-      <p id="familyIntro">Als hij iets afvinkt, krijgt hij een berichtje te zien of te horen: een filmpje, foto of spraakbericht. Kies bij welk moment het hoort. Filmpjes tot 3 minuten worden eerst verkleind, dat duurt net zo lang als het filmpje zelf.</p>
+      <p id="familyIntro">Elke keer dat papa iets afvinkt, krijgt hij een berichtje van de familie: een tekstje, filmpje, foto of spraakbericht.</p>
+      <ol class="steps">
+        <li>Kies bij welk moment je berichtje hoort. Twijfel je? Laat het op <b>Altijd</b> staan.</li>
+        <li>Typ een tekstje, kies een filmpje of foto, of spreek iets in.</li>
+        <li>Tik op <b>Versturen</b>. Een filmpje wordt eerst verkleind, dat duurt even.</li>
+      </ol>
       <div class="uploader"></div>
       <p class="note" id="familyCount"></p>
     </div>
@@ -350,7 +358,7 @@ const MAXWEEK = 16, GLAS = 250;
 const cheers = ["Top gedaan!", "Weer een stap vooruit!", "Kanjer!", "Zo kom je er wel!", "Lekker bezig!"];
 // Bij welk moment een beloning hoort. "altijd" is de reserve voor elk moment behalve goedemorgen.
 const VOOR = {
-  altijd:   "Altijd",
+  altijd:   "Altijd (bij elk vinkje)",
   oefening: "Bij oefeningen",
   wandelen: "Bij wandelen",
   puzzel:   "Bij de puzzel of foto-opdracht",
@@ -937,10 +945,34 @@ function renderSetup(){
   const pe = $("people"); pe.innerHTML = "";
   for (const p of people){
     const r = document.createElement("div"); r.className="item";
-    r.innerHTML = `<div><b>${esc(p.naam || p.email)}</b><small>${esc(p.email)} · ${rolNaam[p.rol]}</small></div>${p.rol==="beheer" ? "" : '<button class="link danger">Weghalen</button>'}`;
-    const del = r.querySelector("button");
+    r.innerHTML = `<div><b>${esc(p.naam || p.email)}</b><small>${esc(p.email)} · ${rolNaam[p.rol]}</small></div>${p.rol==="beheer" ? "" : '<div><button class="link">Uitnodiging kopiëren</button><button class="link danger">Weghalen</button></div>'}`;
+    const [uitn, del] = r.querySelectorAll("button");
+    if (uitn) uitn.onclick = () => kopieer(uitnodiging(p), r);
     if (del) del.onclick = () => confirmDelete(del, async () => { await sb.from("toegang").delete().eq("email", p.email); await loadAll(); });
     pe.appendChild(r);
+  }
+}
+// Kant-en-klaar WhatsApp-berichtje met de link en de stappen.
+function uitnodiging(p){
+  const link = location.origin + location.pathname;
+  const wat = p.rol === "deelnemer"
+    ? "Hierin vink je elke dag je oefeningen en je water af, en krijg je berichtjes van ons."
+    : "Hierin kun je papa filmpjes, foto's, spraakberichten of een tekstje sturen. Die krijgt hij te zien als hij zijn oefeningen afvinkt. Je kunt ook meekijken hoe het gaat.";
+  return `Hoi ${p.naam || ""}! Ik heb een appje gemaakt voor papa's herstel. ${wat}
+
+Zo doe je mee:
+1. Open ${link} (iPhone: in Safari, Android: in Chrome)
+2. Tik op "Eerste keer? Account maken"
+3. Gebruik precies dit e-mailadres: ${p.email} en kies zelf een wachtwoord
+4. Zet de app op je beginscherm: Delen → Zet op beginscherm${p.rol === "deelnemer" ? "" : "\n5. Tik op \"Berichtje sturen\" en stuur je eerste berichtje!"}`;
+}
+async function kopieer(tekst, r){
+  try { await navigator.clipboard.writeText(tekst); toast("Gekopieerd! Plak het in WhatsApp."); }
+  catch {
+    // Kopiëren mag niet (oudere browser): tekst tonen om zelf te kopiëren.
+    r.querySelector("textarea")?.remove();
+    const ta = document.createElement("textarea"); ta.value = tekst; ta.rows = 8; ta.readOnly = true; ta.style.flexBasis = "100%";
+    r.appendChild(ta); ta.focus(); ta.select();
   }
 }
 $("personForm").addEventListener("submit", async e => {
@@ -1065,7 +1097,7 @@ for (const box of document.querySelectorAll(".uploader")){
   box.innerHTML = `
     <div class="row">
       <label>Bij welk moment?<select class="voor">${voorOptions("altijd")}</select></label>
-      <label>Welke week?<select class="week">${weekOptions(null)}</select></label>
+      <label class="weeklabel">Welke week?<select class="week">${weekOptions(null)}</select></label>
     </div>
     <label>Tekst (optioneel)<textarea class="tekst" rows="2" maxlength="280" placeholder="Goed bezig pap, we zijn trots op je!"></textarea></label>
     <p class="note">Alleen tekst kan ook. Kies je hieronder iets, dan komt de tekst erbij te staan.</p>
@@ -1183,6 +1215,7 @@ async function boot(){
   canSetup = me.rol === "beheer";
   $("tabs").hidden = !(canSetup || me.rol === "familie");
   $("tabSetup").textContent = me.rol === "familie" ? "Berichtje sturen" : "Instellen";
+  for (const l of $("viewFamily").querySelectorAll(".weeklabel")) l.hidden = true; // zussen: geen weekkeuze
   show(me.rol === "familie" ? "family" : "today");
   await loadAll();
 }
