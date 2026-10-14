@@ -206,7 +206,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
   <section id="viewToday" class="view" hidden>
     <div class="card past" id="pastBanner" hidden>
-      <p>Je kijkt naar <b id="pastName"></b>. Vergeten iets af te vinken? Dat kan hier nog.</p>
+      <p>Je kijkt naar <b id="pastName"></b>.<span id="pastHint"> Vergeten iets af te vinken? Dat kan hier nog.</span></p>
       <button class="primary" id="backToday">Terug naar vandaag</button>
     </div>
     <div class="card survived" id="survivedCard" hidden>
@@ -418,6 +418,8 @@ function pickMedia(cat){
 const markSeen = (l, m) => me.rol === "deelnemer" && m && m.soort !== "tekst" ? {...l, gezien: [...(l.gezien || []), m.id]} : l;
 
 let canSetup = false, ready = false, me = {}, people = [];
+// Alleen papa vinkt af; de familie kijkt mee.
+const kanAfvinken = () => me.rol === "deelnemer";
 let weken = {}, videos = [], settings = {}, log = {}, recent = [], day = iso(new Date());
 let setupWeek = null, editing = null;
 
@@ -505,7 +507,7 @@ async function greet(){
 // "Operatie overleefd": vanaf de operatiedag zichtbaar, tot hij er één keer op tikt.
 const overleefdOp = () => recent.find(r => r.overleefd)?.datum || (log.overleefd ? day : null);
 function renderSurvived(){
-  const kan = settings.operatie && day >= settings.operatie && me.rol !== "familie" && isToday();
+  const kan = settings.operatie && day >= settings.operatie && kanAfvinken() && isToday();
   $("survivedCard").hidden = !kan || !!overleefdOp();
 }
 // Berichtenregen: alle berichtjes voor "Operatie overleefd" na elkaar, oudste eerst.
@@ -617,12 +619,14 @@ function renderWater(){
   $("litres").innerHTML = `${fmtL(ml)} <small>van ${fmtL(goal)}</small>`;
   const left = Math.ceil((goal-ml)/GLAS);
   $("waterLeft").textContent = ml>=goal ? "Fles vol! Extra drinken mag altijd." : `Nog ${left} ${left===1?"glas":"glazen"} te gaan`;
-  $("waterMin").disabled = ml<=0;
+  $("waterMin").disabled = ml<=0 || !kanAfvinken();
+  $("waterPlus").disabled = !kanAfvinken();
 }
 
 function renderToday(){
   if (!ready) return;
   $("pastBanner").hidden = isToday();
+  $("pastHint").hidden = !kanAfvinken();
   if (!isToday()) $("pastName").textContent = new Date(day+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"long"});
   renderWater();
   $("stepsNum").textContent = log.stappen ? log.stappen.toLocaleString("nl-NL") : "–";
@@ -646,6 +650,7 @@ function renderToday(){
       b.textContent = i<c ? "✓" : String(i+1);
       b.setAttribute("aria-label", `${t.naam}, keer ${i+1} ${i<c?"gedaan, tik om terug te zetten":"afvinken"}`);
       b.onclick = () => save({[t.id]: i<c ? i : i+1}, i>=c ? {cat: catOf(t)} : null);
+      b.disabled = !kanAfvinken();
       card.querySelector(".dots").appendChild(b);
     }
     el.appendChild(card);
@@ -675,6 +680,7 @@ function renderMood(){
     b.setAttribute("aria-pressed", log.gevoel == n);
     b.innerHTML = `<span aria-hidden="true">${esc(g.e)}</span>${esc(g.l)}`;
     b.onclick = async () => { if (await save({gevoel: +n}, null)) toast(g.r); };
+    b.disabled = !kanAfvinken();
     $("moods").appendChild(b);
   }
 }
@@ -721,7 +727,7 @@ function renderFotoOpdracht(t){
   card.className = "card task" + (klaar ? " alldone" : "");
   card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Maak een foto van</p><p class="opdracht">${esc(opdracht)}</p>`;
   if (klaar && fotoUrls[log.foto]) card.insertAdjacentHTML("beforeend", `<img class="fotoklaar" src="${fotoUrls[log.foto]}" alt="${esc(opdracht)}">`);
-  if (me.rol === "familie" && !klaar){ card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
+  if (!kanAfvinken()){ if (!klaar) card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
   const lab = document.createElement("label");
   lab.className = klaar ? "link" : "big";
   lab.innerHTML = `${klaar ? "Andere foto maken" : "Maak de foto"}<input type="file" accept="image/*" capture="environment" class="vh">`;
@@ -787,6 +793,7 @@ function renderPuzzle(t){
   // Toetsenbord met de beste kleur die elke letter al kreeg.
   const best = {};
   for (const g of gokken) score(g, woord).forEach((s, i) => { if ((RANG[s] || 0) > (RANG[best[g[i]]] || 0)) best[g[i]] = s; });
+  if (!kanAfvinken()){ card.insertAdjacentHTML("beforeend", `<p>${gokken.length ? `${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"} tot nu toe.` : "Nog niet gespeeld vandaag."}</p>`); return card; }
   const kbd = document.createElement("div"); kbd.className = "wkbd";
   for (const rij of ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]){
     const r = document.createElement("div");
