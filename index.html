@@ -302,7 +302,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
 
     <div class="card">
       <h2>Wie mag erin?</h2>
-      <p><b>Afvinken</b>: papa. <b>Berichtjes sturen</b>: de zussen, die kunnen ook meekijken en afvinken. Voeg iemand toe en tik daarna op <b>Uitnodiging kopiëren</b>: je krijgt een kant-en-klaar berichtje met de link en de stappen, om in WhatsApp te plakken.</p>
+      <p><b>Alles, net als jij</b>: kan ook instellen. <b>Berichtjes sturen</b>: alleen berichtjes, meekijken en afvinken. <b>Afvinken</b>: papa. Voeg iemand toe en tik daarna op <b>Uitnodiging kopiëren</b>: je krijgt een kant-en-klaar berichtje met de link en de stappen, om in WhatsApp te plakken.</p>
       <div id="people"></div>
       <form id="personForm">
         <div class="row">
@@ -310,7 +310,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
           <label>E-mailadres<input id="pEmail" type="email" required></label>
         </div>
         <div class="row">
-          <label>Mag<select id="pRol"><option value="familie">Berichtjes sturen (en meekijken)</option><option value="deelnemer">Afvinken (papa)</option></select></label>
+          <label>Mag<select id="pRol"><option value="beheer">Alles, net als jij</option><option value="familie">Berichtjes sturen en meekijken</option><option value="deelnemer">Afvinken (papa)</option></select></label>
           <button class="primary" type="submit">Toevoegen</button>
         </div>
       </form>
@@ -941,12 +941,15 @@ function renderSetup(){
     ve.appendChild(r);
   }
 
-  const rolNaam = {beheer:"Beheer", deelnemer:"Afvinken", familie:"Berichtjes sturen"};
+  const rolNaam = {beheer:"Alles, net als jij", familie:"Berichtjes sturen en meekijken", deelnemer:"Afvinken (papa)"};
+  const rolSelect = sel => Object.entries(rolNaam).map(([k,v]) => `<option value="${k}"${k===sel?" selected":""}>${v}</option>`).join("");
   const pe = $("people"); pe.innerHTML = "";
   for (const p of people){
     const r = document.createElement("div"); r.className="item";
-    r.innerHTML = `<div><b>${esc(p.naam || p.email)}</b><small>${esc(p.email)} · ${rolNaam[p.rol]}</small></div>${p.rol==="beheer" ? "" : '<div><button class="link">Uitnodiging kopiëren</button><button class="link danger">Weghalen</button></div>'}`;
-    const [uitn, del] = r.querySelectorAll("button");
+    const ik = p.email === me.email; // jezelf kun je niet weghalen of een andere rol geven
+    r.innerHTML = `<div><b>${esc(p.naam || p.email)}</b><small>${esc(p.email)}${ik ? " · jij" : ""}</small></div>${ik ? "" : `<div><select aria-label="Rol">${rolSelect(p.rol)}</select><button class="link">Uitnodiging kopiëren</button><button class="link danger">Weghalen</button></div>`}`;
+    const sel = r.querySelector("select"), [uitn, del] = r.querySelectorAll("button");
+    if (sel) sel.onchange = async () => { const {error} = await sb.from("toegang").update({rol: sel.value}).eq("email", p.email); if (error) toast("Wijzigen lukte niet"); else { p.rol = sel.value; toast("Rol aangepast"); } };
     if (uitn) uitn.onclick = () => kopieer(uitnodiging(p), r);
     if (del) del.onclick = () => confirmDelete(del, async () => { await sb.from("toegang").delete().eq("email", p.email); await loadAll(); });
     pe.appendChild(r);
@@ -957,7 +960,7 @@ function uitnodiging(p){
   const link = location.origin + location.pathname;
   const wat = p.rol === "deelnemer"
     ? "Hierin vink je elke dag je oefeningen en je water af, en krijg je berichtjes van ons."
-    : "Hierin kun je papa filmpjes, foto's, spraakberichten of een tekstje sturen. Die krijgt hij te zien als hij zijn oefeningen afvinkt. Je kunt ook meekijken hoe het gaat.";
+    : "Hierin kun je papa filmpjes, foto's, spraakberichten of een tekstje sturen. Die krijgt hij te zien als hij zijn oefeningen afvinkt. Je kunt ook meekijken hoe het gaat" + (p.rol === "beheer" ? " en alles instellen, net als ik." : ".");
   return `Hoi ${p.naam || ""}! Ik heb een appje gemaakt voor papa's herstel. ${wat}
 
 Zo doe je mee:
