@@ -90,6 +90,25 @@ label.big{display:inline-flex;justify-content:center;align-items:center;cursor:p
 .album small{color:var(--muted);font-size:14px;line-height:1.3}
 .steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
 .steps li{padding-left:4px}
+details.card>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"+";font:700 24px/1 var(--display);color:var(--brand)}
+details.card[open]>summary::after{content:"–"}
+details.card>summary h2{margin:0}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chips button{padding:5px 12px;font-size:14px;border-radius:999px}
+details.group{border-top:1px solid var(--line);padding-top:8px}
+details.group>summary{cursor:pointer;font-weight:700;font-size:17px;padding-block:4px}
+.msg{border-top:0;padding-top:6px;flex-wrap:nowrap;align-items:flex-start}
+.msg img,.msg .ico{width:48px;height:48px;flex:none;border-radius:8px;object-fit:cover;display:grid;place-items:center;font-size:24px;background:var(--glass)}
+.msg .grow{flex:1 1 0;min-width:0}
+.msg .grow b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg .acts{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;flex:0 1 auto}
+@media (max-width:520px){.msg{flex-wrap:wrap}.msg .acts{flex-basis:100%;justify-content:flex-start}}
+.uploader.drop{outline:3px dashed var(--brand);outline-offset:6px;border-radius:8px}
+label.pick{font-size:19px;padding:14px 20px;width:100%}
+details.opties>summary{cursor:pointer;font-weight:700;font-size:16px}
+.mrow>label:first-child{flex:0 1 90px}
 .hday{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid var(--line);padding-block:10px}
 .hday svg{width:24px;height:24px}
 .hday b{display:block}
@@ -155,6 +174,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
     </div>
     <div class="tabs" id="tabs" hidden>
       <button id="tabToday" class="primary">Vandaag</button>
+      <button id="tabMsgs">Berichtjes</button>
       <button id="tabSetup">Instellen</button>
     </div>
   </header>
@@ -248,18 +268,18 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   </section>
 
   <section id="viewSetup" class="view" hidden>
-    <div class="card">
-      <h2>Algemeen</h2>
+    <details class="card" open>
+      <summary><h2>Algemeen</h2></summary>
       <div class="row">
         <label>Naam op het scherm<input id="setName" placeholder="Papa"></label>
         <label>Datum operatie<input id="setOp" type="date"></label>
         <label>Minimaal drinken (liter)<input id="setWater" type="number" min="0.5" max="4" step="0.25" placeholder="2"></label>
       </div>
       <button class="primary" id="saveSettings">Opslaan</button>
-    </div>
+    </details>
 
-    <div class="card">
-      <h2>Plan per week</h2>
+    <details class="card">
+      <summary><h2>Plan per week</h2></summary>
       <p>Een week zonder eigen plan gebruikt het plan van de week ervoor. Stippellijn = geen eigen plan.</p>
       <div class="weeks" id="weeks"></div>
       <p class="note" id="weekInfo"></p>
@@ -275,33 +295,33 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
       </form>
-    </div>
+    </details>
 
-    <div class="card">
-      <h2>Woord van de dag</h2>
+    <details class="card">
+      <summary><h2>Woord van de dag</h2></summary>
       <p>Zet in het plan een onderdeel met soort <b>Woord van de dag</b>. Elke dag raadt hij één woord, in 6 pogingen. Zet hieronder <b>één woord per regel</b>, in de volgorde waarin hij ze krijgt. Woorden van 3 tot 10 letters. Wil je een kruiswoord-omschrijving erbij? Zet die achter een =, bijvoorbeeld <b>TAART = Zoet gebak op een verjaardag</b>.</p>
       <label>De woorden<textarea id="setPuzzel" rows="10"></textarea></label>
       <p class="note" id="woordStand"></p>
       <button class="primary" id="savePuzzel">Woorden opslaan</button>
-    </div>
+    </details>
 
-    <div class="card">
-      <h2>Foto-opdrachten</h2>
+    <details class="card">
+      <summary><h2>Foto-opdrachten</h2></summary>
       <p>Zet in het plan een onderdeel met soort <b>Foto-opdracht</b>. Elke dag krijgt hij de volgende opdracht: "Maak een foto van …". Eén opdracht per regel.</p>
       <label>De opdrachten<textarea id="setOpdrachten" rows="10"></textarea></label>
       <p class="note" id="opdrachtStand"></p>
       <button class="primary" id="saveOpdrachten">Opdrachten opslaan</button>
-    </div>
+    </details>
 
-    <div class="card">
-      <h2>Beloningen</h2>
-      <p>Filmpjes, foto's en spraakberichten. Kies bij elk bericht bij welk moment het hoort. Zonder passend bericht pakt de app er een van "Altijd".</p>
-      <div class="uploader"></div>
-      <div id="videos"></div>
-    </div>
+    <details class="card">
+      <summary><h2>Smileys</h2></summary>
+      <p>De vier knoppen bij "Hoe voel je je vandaag?" en wat hij te lezen krijgt als hij erop tikt.</p>
+      <div id="moodSetup"></div>
+      <button class="primary" id="saveMood">Smileys opslaan</button>
+    </details>
 
-    <div class="card">
-      <h2>Wie mag erin?</h2>
+    <details class="card">
+      <summary><h2>Wie mag erin?</h2></summary>
       <p><b>Alles, net als jij</b>: kan ook instellen. <b>Berichtjes sturen</b>: alleen berichtjes, meekijken en afvinken. <b>Afvinken</b>: papa. Voeg iemand toe en tik daarna op <b>Uitnodiging kopiëren</b>: je krijgt een kant-en-klaar berichtje met de link en de stappen, om in WhatsApp te plakken.</p>
       <div id="people"></div>
       <form id="personForm">
@@ -314,7 +334,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
           <button class="primary" type="submit">Toevoegen</button>
         </div>
       </form>
-    </div>
+    </details>
 
     <button class="link logout">Uitloggen</button>
   </section>
@@ -322,14 +342,13 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   <section id="viewFamily" class="view" hidden>
     <div class="card">
       <h2>Stuur een berichtje</h2>
-      <p id="familyIntro">Elke keer dat papa iets afvinkt, krijgt hij een berichtje van de familie: een tekstje, filmpje, foto of spraakbericht.</p>
-      <ol class="steps">
-        <li>Kies bij welk moment je berichtje hoort. Twijfel je? Laat het op <b>Altijd</b> staan.</li>
-        <li>Typ een tekstje, kies een filmpje of foto, of spreek iets in.</li>
-        <li>Tik op <b>Versturen</b>. Een filmpje wordt eerst verkleind, dat duurt even.</li>
-      </ol>
+      <p>Elke keer dat papa iets afvinkt, krijgt hij een berichtje van de familie. Kies foto's of filmpjes, typ een tekstje of spreek iets in, en tik op <b>Versturen</b>. Meer hoeft niet.</p>
       <div class="uploader"></div>
-      <p class="note" id="familyCount"></p>
+    </div>
+    <div class="card">
+      <div class="weekhead"><h2>Alle berichtjes</h2><span class="note" id="familyCount"></span></div>
+      <div class="chips" id="soortFilter"></div>
+      <div id="videos"></div>
     </div>
     <button class="link logout">Uitloggen</button>
   </section>
@@ -410,9 +429,9 @@ const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) +
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
 function show(which){
   for (const v of ["Login","Today","Setup","Family"]) $("view"+v).hidden = v.toLowerCase()!==which;
-  const second = me.rol === "familie" ? "family" : "setup";
-  $("tabToday").className = which==="today"?"primary":""; $("tabSetup").className = which===second?"primary":"";
+  $("tabToday").className = which==="today"?"primary":""; $("tabMsgs").className = which==="family"?"primary":""; $("tabSetup").className = which==="setup"?"primary":"";
   if (which==="setup") renderSetup();
+  if (which==="family") renderMsgs();
 }
 
 /* ---------- Gegevens ---------- */
@@ -456,8 +475,7 @@ async function loadAll(){
   videos = videos.filter(v => v.url || (!v.pad && v.tekst)); // tekstberichten hebben geen bestand
   ready = true;
   renderHeader(); renderToday(); if (!$("viewSetup").hidden) renderSetup();
-  const mine = videos.filter(v => v.van === me.naam).length;
-  $("familyCount").textContent = videos.length ? `Er staan ${videos.length} berichtjes klaar${mine ? `, waarvan ${mine} van jou` : ""}.` : "Er staan nog geen berichtjes klaar. Jij mag de eerste zijn!";
+  if (!$("viewFamily").hidden) renderMsgs();
   syncSteps();
   greet();
 }
@@ -631,16 +649,22 @@ function renderToday(){
   renderHistory();
 }
 
-const GEVOEL = {1:["😣","Slecht"], 2:["😐","Matig"], 3:["🙂","Goed"], 4:["😄","Heel goed"]};
-const GEVOEL_REACTIE = {1:"Balen. Rustig aan vandaag, het mag.", 2:"Dank je. Elke dag een stapje.", 3:"Fijn om te horen!", 4:"Wat goed! Geniet ervan."};
+// Standaardsmileys; in Instellen aan te passen (settings.gevoel overschrijft per knop).
+const GEVOEL_STD = {
+  1: {e:"😣", l:"Slecht",    r:"Balen. Rustig aan vandaag, het mag."},
+  2: {e:"😐", l:"Matig",     r:"Dank je. Elke dag een stapje."},
+  3: {e:"🙂", l:"Goed",      r:"Fijn om te horen!"},
+  4: {e:"😄", l:"Heel goed", r:"Wat goed! Geniet ervan."},
+};
+const gevoel = () => Object.fromEntries([1,2,3,4].map(n => [n, {...GEVOEL_STD[n], ...((settings.gevoel || {})[n] || {})}]));
 function renderMood(){
   $("moods").innerHTML = "";
-  for (const [n, [emoji, label]] of Object.entries(GEVOEL)){
+  for (const [n, g] of Object.entries(gevoel())){
     const b = document.createElement("button");
     b.className = log.gevoel == n ? "on" : "";
     b.setAttribute("aria-pressed", log.gevoel == n);
-    b.innerHTML = `<span aria-hidden="true">${emoji}</span>${label}`;
-    b.onclick = async () => { if (await save({gevoel: +n}, null)) toast(GEVOEL_REACTIE[n]); };
+    b.innerHTML = `<span aria-hidden="true">${esc(g.e)}</span>${esc(g.l)}`;
+    b.onclick = async () => { if (await save({gevoel: +n}, null)) toast(g.r); };
     $("moods").appendChild(b);
   }
 }
@@ -669,8 +693,8 @@ function renderHistory(){
     const klaar = d === day ? isKlaar(log, day) : !!l.klaar;
     const stats = [l.overleefd ? "🏅 Operatie overleefd" : "", tot ? `Oefeningen ${done}/${tot}` : "", `Water ${fmtL(l.water||0)}`, l.stappen ? `${nl(l.stappen)} stappen` : ""].filter(Boolean).join(" · ");
     const naam = d === iso(new Date()) ? "Vandaag" : new Date(d+"T12:00").toLocaleDateString("nl-NL",{weekday:"long",day:"numeric",month:"short"});
-    const g = GEVOEL[l.gevoel];
-    return `<div class="hday" role="button" tabindex="0" data-d="${d}"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${g[1]}" aria-label="Gevoel: ${g[1]}"`:""}>${g?g[0]:""}</div></div>`;
+    const g = gevoel()[l.gevoel];
+    return `<div class="hday" role="button" tabindex="0" data-d="${d}"><svg viewBox="0 0 34 32" aria-label="${klaar?"Alles af":"Niet alles af"}"><path d="${STAR}" fill="${klaar?"var(--sun)":"none"}" stroke="${klaar?"var(--sun)":"var(--muted)"}" stroke-width="2" stroke-linejoin="round"/></svg><div><b>${naam}</b><small>${stats}</small></div><div class="mood" ${g?`title="${esc(g.l)}" aria-label="Gevoel: ${esc(g.l)}"`:""}>${g?esc(g.e):""}</div></div>`;
   }).join("") || '<p class="note">Nog niets om terug te kijken.</p>';
   $("histDays").onclick = e => { const r = e.target.closest(".hday"); if (r) goDay(r.dataset.d); };
 }
@@ -886,6 +910,7 @@ function renderSetup(){
   { const o = opdrachten(), i = opdrachtNr(); $("opdrachtStand").textContent = `${o.length} opdrachten. Hij is bij opdracht ${i % o.length + 1}: ${o[i % o.length] || "-"}${i >= o.length ? " (de lijst begint opnieuw)" : ""}.`; }
   { const ws = woordenlijst(), i = woordNr(); $("woordStand").textContent = `${ws.length} woorden. Hij is bij woord ${i % ws.length + 1}: ${ws[i % ws.length] || "-"}${i >= ws.length ? " (de lijst begint opnieuw, zet er meer woorden bij)" : ""}.`; }
   if (setupWeek == null) setupWeek = weekOf(day);
+  if (!$("moodSetup").children.length) $("moodSetup").innerHTML = Object.entries(gevoel()).map(([n, g]) => `<div class="row mrow" data-n="${n}"><label>Smiley<input class="me" maxlength="4" value="${esc(g.e)}"></label><label>Naam<input class="ml" maxlength="20" value="${esc(g.l)}"></label><label>Wat hij dan leest<input class="mr" maxlength="120" value="${esc(g.r)}"></label></div>`).join("");
 
   $("weeks").innerHTML = "";
   for (let w=0; w<=MAXWEEK; w++){
@@ -921,26 +946,6 @@ function renderSetup(){
     el.appendChild(r);
   }
 
-  const ve = $("videos");
-  ve.innerHTML = videos.length ? "" : '<p class="note">Nog geen beloningen. Zonder bericht krijgt hij confetti.</p>';
-  for (const v of videos){
-    const r = document.createElement("div"); r.className="item";
-    const kop = v.soort === "tekst" ? v.tekst.slice(0,60) + (v.tekst.length > 60 ? "…" : "") : v.titel;
-    r.innerHTML = `<div><b>${esc(kop)}</b><small>${SOORT[v.soort] || "Filmpje"}${v.van?` van ${esc(v.van)}`:""}${v.tekst && v.soort!=="tekst" ? " · met tekst" : ""}</small></div><div><select aria-label="Moment">${voorOptions(v.voor)}</select><select class="wk" aria-label="Week">${weekOptions(v.week)}</select><button class="link">Bekijken</button><button class="link danger">Verwijderen</button></div>`;
-    const wk = r.querySelector(".wk");
-    wk.onchange = async () => { const week = wk.value === "" ? null : +wk.value; const {error} = await sb.from("filmpjes").update({week}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.week = week; };
-    const sel = r.querySelector("select");
-    sel.onchange = async () => { const {error} = await sb.from("filmpjes").update({voor: sel.value}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.voor = sel.value; };
-    const [view, del] = r.querySelectorAll("button");
-    view.onclick = () => showMedia(v.titel, v);
-    del.onclick = () => confirmDelete(del, async () => {
-      await sb.from("filmpjes").delete().eq("id", v.id);
-      if (v.pad) await sb.storage.from("filmpjes").remove([v.pad]);
-      await loadAll();
-    });
-    ve.appendChild(r);
-  }
-
   const rolNaam = {beheer:"Alles, net als jij", familie:"Berichtjes sturen en meekijken", deelnemer:"Afvinken (papa)"};
   const rolSelect = sel => Object.entries(rolNaam).map(([k,v]) => `<option value="${k}"${k===sel?" selected":""}>${v}</option>`).join("");
   const pe = $("people"); pe.innerHTML = "";
@@ -955,6 +960,48 @@ function renderSetup(){
     pe.appendChild(r);
   }
 }
+// Alle berichtjes, per moment gegroepeerd, nieuwste bovenaan. Beheer kan verplaatsen en verwijderen.
+let soortFilter = "", dichtGroepen = new Set();
+const ICO = {video:"🎬", audio:"🎙️", tekst:"💬"};
+function renderMsgs(){
+  const tel = k => videos.filter(v => !k || v.soort === k).length;
+  $("soortFilter").innerHTML = [["", "Alles"], ...Object.entries(SOORT)].map(([k, l]) => `<button type="button" class="${k === soortFilter ? "primary" : ""}" data-s="${k}">${l} (${tel(k)})</button>`).join("");
+  $("soortFilter").onclick = e => { const b = e.target.closest("button"); if (b){ soortFilter = b.dataset.s; renderMsgs(); } };
+  const mine = videos.filter(v => v.van === me.naam).length;
+  $("familyCount").textContent = videos.length ? `${videos.length} berichtjes${mine ? `, ${mine} van jou` : ""}` : "";
+  const ve = $("videos"); ve.innerHTML = "";
+  if (!videos.length){ ve.innerHTML = '<p class="note">Nog geen berichtjes. Zonder bericht krijgt hij confetti.</p>'; return; }
+  const lijst = videos.filter(v => !soortFilter || v.soort === soortFilter).slice().reverse();
+  for (const [cat, label] of Object.entries(VOOR)){
+    const items = lijst.filter(v => (v.voor || "altijd") === cat);
+    if (!items.length) continue;
+    const d = document.createElement("details"); d.className = "group"; d.open = !dichtGroepen.has(cat);
+    d.innerHTML = `<summary>${label} <span class="note">(${items.length})</span></summary>`;
+    d.ontoggle = () => { if (d.open) dichtGroepen.delete(cat); else dichtGroepen.add(cat); };
+    for (const v of items) d.appendChild(msgRow(v));
+    ve.appendChild(d);
+  }
+}
+function msgRow(v){
+  const r = document.createElement("div"); r.className = "item msg";
+  const kop = v.soort === "tekst" ? v.tekst.slice(0, 70) + (v.tekst.length > 70 ? "…" : "") : v.titel;
+  const datum = v.gemaakt ? new Date(v.gemaakt).toLocaleDateString("nl-NL", {day: "numeric", month: "short"}) : "";
+  const thumb = v.soort === "foto" ? `<img src="${v.url}" alt="" loading="lazy">` : `<span class="ico" aria-hidden="true">${ICO[v.soort] || ICO.video}</span>`;
+  const info = [SOORT[v.soort] || "Filmpje", v.van && `van ${esc(v.van)}`, v.tekst && v.soort !== "tekst" && "met tekst", v.week != null && (v.week === 0 ? "voor de OK" : "week " + v.week), datum].filter(Boolean).join(" · ");
+  r.innerHTML = `${thumb}<div class="grow"><b>${esc(kop)}</b><small>${info}</small></div><div class="acts">${canSetup ? `<select class="mv" aria-label="Moment">${voorOptions(v.voor)}</select><select class="wk" aria-label="Week">${weekOptions(v.week)}</select>` : ""}<button class="link">Bekijken</button>${canSetup ? '<button class="link danger">Verwijderen</button>' : ""}</div>`;
+  const [view, del] = r.querySelectorAll("button");
+  view.onclick = () => showMedia(v.titel, v);
+  if (!canSetup) return r;
+  const mv = r.querySelector(".mv"), wk = r.querySelector(".wk");
+  mv.onchange = async () => { const {error} = await sb.from("filmpjes").update({voor: mv.value}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else { v.voor = mv.value; renderMsgs(); } };
+  wk.onchange = async () => { const week = wk.value === "" ? null : +wk.value; const {error} = await sb.from("filmpjes").update({week}).eq("id", v.id); if (error) toast("Wijzigen lukte niet"); else v.week = week; };
+  del.onclick = () => confirmDelete(del, async () => {
+    await sb.from("filmpjes").delete().eq("id", v.id);
+    if (v.pad) await sb.storage.from("filmpjes").remove([v.pad]);
+    await loadAll();
+  });
+  return r;
+}
 // Kant-en-klaar WhatsApp-berichtje met de link en de stappen.
 function uitnodiging(p){
   const link = location.origin + location.pathname;
@@ -967,7 +1014,7 @@ Zo doe je mee:
 1. Open ${link} (iPhone: in Safari, Android: in Chrome)
 2. Tik op "Eerste keer? Account maken"
 3. Gebruik precies dit e-mailadres: ${p.email} en kies zelf een wachtwoord
-4. Zet de app op je beginscherm: Delen → Zet op beginscherm${p.rol === "deelnemer" ? "" : "\n5. Tik op \"Berichtje sturen\" en stuur je eerste berichtje!"}`;
+4. Zet de app op je beginscherm: Delen → Zet op beginscherm${p.rol === "deelnemer" ? "" : "\n5. Tik op \"Berichtjes\" en stuur je eerste berichtje!"}`;
 }
 async function kopieer(tekst, r){
   try { await navigator.clipboard.writeText(tekst); toast("Gekopieerd! Plak het in WhatsApp."); }
@@ -1018,6 +1065,13 @@ $("saveOpdrachten").onclick = async () => {
   const {error} = await sb.from("instellingen").update({ opdrachten: tekst === OPDRACHTEN ? null : tekst || null }).eq("id", 1);
   if (error){ toast("Opslaan lukte niet: " + error.message); return; }
   toast("Opdrachten opgeslagen"); await loadAll();
+};
+$("saveMood").onclick = async () => {
+  const gevoel = {};
+  for (const row of $("moodSetup").querySelectorAll(".mrow")) gevoel[row.dataset.n] = { e: row.querySelector(".me").value.trim() || GEVOEL_STD[row.dataset.n].e, l: row.querySelector(".ml").value.trim() || GEVOEL_STD[row.dataset.n].l, r: row.querySelector(".mr").value.trim() };
+  const {error} = await sb.from("instellingen").update({gevoel}).eq("id", 1);
+  if (error){ toast("Opslaan lukte niet: " + error.message); return; }
+  toast("Smileys opgeslagen"); await loadAll();
 };
 $("savePuzzel").onclick = async () => {
   const tekst = $("setPuzzel").value.trim();
@@ -1098,26 +1152,41 @@ const fmtTime = s => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,
 // Zelfde uploader voor jou (Instellen) en de zussen (Stuur een berichtje).
 for (const box of document.querySelectorAll(".uploader")){
   box.innerHTML = `
-    <div class="row">
-      <label>Bij welk moment?<select class="voor">${voorOptions("altijd")}</select></label>
-      <label class="weeklabel">Welke week?<select class="week">${weekOptions(null)}</select></label>
-    </div>
-    <label>Tekst (optioneel)<textarea class="tekst" rows="2" maxlength="280" placeholder="Goed bezig pap, we zijn trots op je!"></textarea></label>
-    <p class="note">Alleen tekst kan ook. Kies je hieronder iets, dan komt de tekst erbij te staan.</p>
-    <label>Filmpjes of foto's kiezen<input type="file" class="upload" accept="video/*,image/*,audio/*" multiple></label>
+    <label class="big pick">Foto's of filmpjes kiezen<input type="file" class="upload vh" accept="video/*,image/*,audio/*" multiple></label>
+    <p class="note gekozen"></p>
+    <label>Tekstje (mag ook alleen tekst zijn)<textarea class="tekst" rows="2" maxlength="280" placeholder="Goed bezig pap, we zijn trots op je!"></textarea></label>
     <div class="row"><button type="button" class="rec"${AUDIO && navigator.mediaDevices ? "" : " hidden"}>Spraakbericht inspreken</button></div>
-    <button class="primary send" hidden>Versturen</button>
+    <details class="opties">
+      <summary>Bij welk moment? <span class="note">Nu: Altijd. Niets kiezen is prima.</span></summary>
+      <div class="row">
+        <label>Moment<select class="voor">${voorOptions("altijd")}</select></label>
+        <label class="weeklabel">Welke week?<select class="week">${weekOptions(null)}</select></label>
+      </div>
+    </details>
+    <button class="primary send big" hidden>Versturen</button>
     <p class="note uploadMsg" aria-live="polite"></p>`;
+  box.querySelector(".voor").onchange = e => box.querySelector(".opties summary .note").textContent = `Nu: ${VOOR[e.target.value]}.`;
   const inp = box.querySelector(".upload"), send = box.querySelector(".send"), msg = box.querySelector(".uploadMsg");
   const recBtn = box.querySelector(".rec"), voor = box.querySelector(".voor"), weekSel = box.querySelector(".week"), tekst = box.querySelector(".tekst");
   let opnames = []; // ingesproken berichten die nog verstuurd moeten worden
   const refresh = () => {
     const n = inp.files.length + opnames.length;
     send.hidden = !n && !tekst.value.trim(); send.textContent = n > 1 ? `Verstuur ${n} berichtjes` : "Versturen";
+    const f = inp.files.length, o = opnames.length;
+    box.querySelector(".gekozen").textContent = [f ? `${f} ${f===1?"bestand":"bestanden"} gekozen` : "", o ? `${o} ${o===1?"spraakbericht":"spraakberichten"}` : ""].filter(Boolean).join(" · ");
     if (n) msg.textContent = "Tik op Versturen. Bij filmpjes het scherm aan laten tot het klaar is.";
   };
   inp.onchange = refresh;
   tekst.oninput = refresh;
+  // Laptop: een hele map met foto's en filmpjes in één keer hierheen slepen.
+  box.ondragover = e => { e.preventDefault(); box.classList.add("drop"); };
+  box.ondragleave = () => box.classList.remove("drop");
+  box.ondrop = e => {
+    e.preventDefault(); box.classList.remove("drop");
+    const dt = new DataTransfer();
+    for (const f of [...inp.files, ...e.dataTransfer.files]) if (/^(image|video|audio)\//.test(f.type)) dt.items.add(f);
+    inp.files = dt.files; refresh();
+  };
 
   let rec = null, timer = null;
   recBtn.onclick = async () => {
@@ -1177,14 +1246,15 @@ for (const box of document.querySelectorAll(".uploader")){
     }
     lock?.release();
     if (ok) msg.textContent = ok > 1 ? `Gelukt! ${ok} berichtjes verstuurd. Dank je wel.` : "Gelukt! Dank je wel.";
-    inp.value = ""; tekst.value = ""; opnames = []; send.hidden = true; recBtn.textContent = "Spraakbericht inspreken";
+    inp.value = ""; tekst.value = ""; opnames = []; send.hidden = true; recBtn.textContent = "Spraakbericht inspreken"; box.querySelector(".gekozen").textContent = "";
     send.disabled = inp.disabled = recBtn.disabled = false;
     await loadAll();
   };
 }
 $("tabToday").onclick = () => show("today");
 $("backToday").onclick = () => goDay(iso(new Date()));
-$("tabSetup").onclick = () => show(me.rol === "familie" ? "family" : "setup");
+$("tabMsgs").onclick = () => show("family");
+$("tabSetup").onclick = () => show("setup");
 for (const b of document.querySelectorAll(".logout")) b.onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 /* ---------- Inloggen ---------- */
@@ -1217,8 +1287,8 @@ async function boot(){
   me = rij;
   canSetup = me.rol === "beheer";
   $("tabs").hidden = !(canSetup || me.rol === "familie");
-  $("tabSetup").textContent = me.rol === "familie" ? "Berichtje sturen" : "Instellen";
-  for (const l of $("viewFamily").querySelectorAll(".weeklabel")) l.hidden = true; // zussen: geen weekkeuze
+  $("tabSetup").hidden = !canSetup;
+  for (const l of document.querySelectorAll(".weeklabel")) l.hidden = !canSetup; // weekkeuze alleen voor beheer
   show(me.rol === "familie" ? "family" : "today");
   await loadAll();
 }
