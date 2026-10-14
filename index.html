@@ -459,8 +459,10 @@ async function loadAll(){
     canSetup ? sb.from("toegang").select().order("rol") : {data: []},
     sb.from("dagplan").select().gte("datum", addDays(day, -150)),
   ]);
-  if (s.error || w.error || f.error || l.error || p.error || dp.error){ toast("Laden lukte niet. Controleer je internet."); return; }
-  dagplan = {}; for (const r of dp.data) dagplan[r.datum] = r;
+  if (s.error || w.error || f.error || l.error || p.error){ toast("Laden lukte niet. Controleer je internet."); return; }
+  // Een ontbrekend of nieuw onderdeel mag de rest niet blokkeren.
+  if (dp.error) toast("Plannen laden lukte niet (" + dp.error.message + "). De rest werkt wel.");
+  dagplan = {}; for (const r of dp.data || []) dagplan[r.datum] = r;
   settings = s.data || {};
   people = p.data;
   weken = {}; for (const r of w.data) weken[r.week] = r.oefeningen || [];
