@@ -28,9 +28,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_wQ0Xv3OUAOAs5D-jxUI6fQ_x1mjNAgt";
   --brand:#5FB3BD; --brand-ink:#0F1A1C; --sun:#F2C14E; --done:#5CC08A; --danger:#E0735F;
   --water:#4FA8E0; --glass:#1E3236; color-scheme:dark;}}
 *{box-sizing:border-box}
+html,button,a,label,input,select,textarea{touch-action:manipulation}
 [hidden]{display:none!important}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
-body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 var(--font)}
+body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.5 var(--font);touch-action:manipulation} /* geen inzoomen bij snel dubbeltikken; knijpen blijft werken */
 .wrap{max-width:640px;margin:0 auto;padding-block:24px 64px;padding-inline:16px;display:flex;flex-direction:column;gap:20px}
 header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 h1{font:800 clamp(28px,7vw,40px)/1.1 var(--display);margin:0;text-wrap:balance}
