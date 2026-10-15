@@ -520,11 +520,15 @@ async function greet(){
 // "Operatie overleefd": vanaf de operatiedag zichtbaar, tot hij er één keer op tikt.
 const overleefdOp = () => recent.find(r => r.overleefd)?.datum || (log.overleefd ? day : null);
 function renderSurvived(){
-  const kan = settings.operatie && day >= settings.operatie && kanAfvinken() && isToday();
+  // Op de operatiedag pas vanaf 11:00, de dagen erna de hele dag.
+  const opDag = day === settings.operatie, laat = new Date().getHours() >= 11;
+  const kan = settings.operatie && day >= settings.operatie && (!opDag || laat) && kanAfvinken() && isToday();
   $("survivedCard").hidden = !kan || !!overleefdOp();
 }
 // Berichtenregen: alle berichtjes voor "Operatie overleefd" na elkaar, oudste eerst.
 let wachtrij = [];
+// Om 11:00 vanzelf verschijnen, ook als de app de hele ochtend openstaat.
+setInterval(() => { if (ready) renderSurvived(); }, 60000);
 $("survived").onclick = () => {
   const alle = videos.filter(v => v.voor === "overleefd");
   save({overleefd: true}, null);
