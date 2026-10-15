@@ -299,7 +299,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
         <label>Uitleg (optioneel)<textarea id="fNote" rows="2" maxlength="300" placeholder="10× aanspannen, 5 tellen vasthouden"></textarea></label>
         <div class="row">
           <label>Keer per dag<input id="fTimes" type="number" min="1" max="10" value="1" required></label>
-          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option><option value="puzzel">Woord van de dag</option><option value="foto">Foto-opdracht</option></select></label>
+          <label>Soort<select id="fSoort"><option value="oefening">Oefening</option><option value="wandelen">Wandelen</option></select></label>
           <button class="primary" type="submit" id="fSubmit">Toevoegen</button>
           <button type="button" id="fCancel" hidden>Annuleren</button>
         </div>
@@ -328,7 +328,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   <section id="viewPlan" class="view" hidden>
     <div class="card">
       <h2>Woord en foto per dag</h2>
-      <p>Per dag het woord dat hij moet raden (3 tot 10 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
+      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (3 tot 10 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
       <div class="row"><button type="button" id="planFill">Vul lege dagen met suggesties</button><span class="note">voor de komende 3 weken</span></div>
       <div id="planRows"></div>
       <details class="group" id="planPast"><summary>Geweest</summary><div id="planPastRows"></div></details>
@@ -428,8 +428,14 @@ function waterGoal(){ return Math.round((+settings.water || 2) * 1000); }
 // Week 0 = voor de operatie, week 1 = dag 0–6 na de operatie, enz.
 function weekOf(date){ if (!settings.operatie) return 1; const n = diffDays(date, settings.operatie); return n < 0 ? 0 : Math.min(MAXWEEK, Math.floor(n/7)+1); }
 function planWeek(w){ for (let i=w; i>=0; i--) if (weken[i]) return i; return null; }
-// Woord van de dag en foto-opdracht tellen alleen mee op dagen waarvoor iets is ingepland.
-function tasksFor(date){ const w = planWeek(weekOf(date)); return w==null ? [] : weken[w].filter(t => (catOf(t) !== "puzzel" || geldigWoord(date)) && (catOf(t) !== "foto" || planVan(date).opdracht)); }
+// Woord van de dag en foto-opdracht komen vanzelf bij een dag zodra ze onder Plannen zijn ingevuld.
+function tasksFor(date){
+  const w = planWeek(weekOf(date));
+  const plan = w == null ? [] : weken[w].filter(t => !["puzzel", "foto"].includes(catOf(t)));
+  if (geldigWoord(date)) plan.push({id: "woord", naam: "Woord van de dag", keer: 1, soort: "puzzel"});
+  if (planVan(date).opdracht) plan.push({id: "foto", naam: "Foto van de dag", keer: 1, soort: "foto"});
+  return plan;
+}
 function isKlaar(l, date){ return tasksFor(date).every(t => (l[t.id]||0) >= t.keer) && (l.water||0) >= waterGoal(); }
 const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) + " L";
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
