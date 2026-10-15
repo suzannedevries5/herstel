@@ -64,6 +64,8 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .wgrid{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,52px));gap:6px;justify-content:center}
 .wgrid.lang{gap:4px}
 .wgrid.lang .wtile{font-size:19px;border-radius:6px}
+.wgrid.heellang{gap:3px}
+.wgrid.heellang .wtile{font-size:15px;border-radius:4px;border-width:1px}
 .wtile{aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--line);border-radius:8px;font:800 26px var(--display);color:var(--ink)}
 .wtile.vol{border-color:var(--muted)}
 .wtile.goed,.wkbd .goed{background:var(--done);border-color:var(--done);color:#fff}
@@ -329,7 +331,7 @@ input,textarea,select{font:inherit;font-weight:400;border:2px solid var(--line);
   <section id="viewPlan" class="view" hidden>
     <div class="card">
       <h2>Woord en foto per dag</h2>
-      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (3 tot 10 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
+      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (minstens 3 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
       <div class="row"><button type="button" id="planFill">Vul lege dagen met suggesties</button><span class="note">voor de komende 3 weken</span></div>
       <div id="planRows"></div>
       <details class="group" id="planPast"><summary>Geweest</summary><div id="planPastRows"></div></details>
@@ -776,7 +778,7 @@ const WOORDEN_SUG = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAA
 const POGINGEN = 6;
 const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 const woordOp = d => norm(planVan(d).woord || "").replace(/[^A-Z]/g, "");
-const geldigWoord = d => woordOp(d).length >= 3 && woordOp(d).length <= 10;
+const geldigWoord = d => woordOp(d).length >= 3;
 const woordVanDaag = () => woordOp(day);
 const clueVanDaag = () => planVan(day).omschrijving || "";
 // Per letter: "goed" (juiste plek), "bijna" (zit erin, andere plek) of "mis". Dubbele letters tellen niet dubbel.
@@ -794,7 +796,7 @@ function renderPuzzle(t){
   card.className = "card task" + (klaar ? " alldone" : "");
   const clue = clueVanDaag();
   card.innerHTML = `<h3>${esc(t.naam)}</h3>${clue ? `<p class="clue">${esc(clue)} <span>(${woord.length})</span></p>` : ""}<p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
-  const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 7 ? " lang" : "");
+  const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 12 ? " heellang" : woord.length > 7 ? " lang" : "");
   grid.style.setProperty("--n", woord.length);
   for (let r = 0; r < POGINGEN; r++){
     const g = gokken[r], s = g ? score(g, woord) : null;
@@ -1031,7 +1033,7 @@ const dagLabel = d => { const x = new Date(d+"T12:00"); return `<b>${x.toLocaleD
 function renderPlan(){
   const vandaag = iso(new Date()), byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
   const komend = Array.from({length: 21}, (_, i) => addDays(vandaag, i));
-  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="12" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
+  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="40" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
   $("planRows").onchange = e => { const r = e.target.closest(".prow"); if (r) bewaarDag(r.dataset.d, r.querySelector(".pw").value, r.querySelector(".pc").value, r.querySelector(".po").value); };
   // Geweest: wat er gepland was en hoe het ging, nieuwste bovenaan.
   const geweest = Array.from({length: 30}, (_, i) => addDays(vandaag, -1 - i)).filter(d => dagplan[d] || byDate[d]?.puzzel || byDate[d]?.foto);
@@ -1046,7 +1048,7 @@ function renderPlan(){
 }
 async function bewaarDag(datum, woord, omschrijving, opdracht){
   const w = woord.trim(), n = norm(w).replace(/[^A-Z]/g, "").length;
-  if (w && (n < 3 || n > 10)){ toast("Een woord heeft 3 tot 10 letters"); return; }
+  if (w && n < 3){ toast("Een woord heeft minstens 3 letters"); return; }
   const rij = {datum, woord: w || null, omschrijving: omschrijving.trim() || null, opdracht: opdracht.trim() || null};
   const {error} = await sb.from("dagplan").upsert(rij);
   if (error){ toast("Opslaan lukte niet: " + error.message); return; }
