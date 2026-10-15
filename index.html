@@ -797,7 +797,7 @@ function renderPuzzle(t){
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
   const clue = clueVanDaag();
-  card.innerHTML = `<h3>${esc(t.naam)}</h3>${clue ? `<p class="clue">${esc(clue)} <span>(${woord.length})</span></p>` : ""}<p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
   const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 12 ? " heellang" : woord.length > 7 ? " lang" : "");
   grid.style.setProperty("--n", woord.length);
   for (let r = 0; r < POGINGEN; r++){
@@ -806,6 +806,15 @@ function renderPuzzle(t){
     for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>`);
   }
   card.appendChild(grid);
+  // De omschrijving is een hint: pas zichtbaar als hij erom vraagt (of als het woord klaar is).
+  if (clue){
+    if (log.hint || klaar) card.insertAdjacentHTML("beforeend", `<p class="clue">Hint: ${esc(clue)}</p>`);
+    else if (kanAfvinken()){
+      const h = document.createElement("button"); h.type = "button"; h.textContent = "Hint";
+      h.onclick = () => { log = {...log, hint: true}; renderToday(); saveLog(log); };
+      card.appendChild(h);
+    } else card.insertAdjacentHTML("beforeend", `<p class="note">Er is een hint, die heeft hij nog niet bekeken.</p>`);
+  }
   if (klaar){
     const gewonnen = gokken.at(-1) === woord;
     card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woord}.`}</b> Morgen een nieuw woord.</p>`);
@@ -1042,7 +1051,7 @@ function renderPlan(){
   $("planPast").hidden = !geweest.length;
   $("planPastRows").innerHTML = geweest.map(d => {
     const pl = planVan(d), l = byDate[d] || {};
-    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
+    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${l.hint ? " (met hint)" : ""}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
     return `<div class="prow past"><div class="pdate">${dagLabel(d)}</div><div class="grow"><small>${[w, o].filter(Boolean).join("<br>")}</small></div></div>`;
   }).join("");
