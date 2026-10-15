@@ -467,6 +467,12 @@ async function loadAll(){
   dagplan = {}; for (const r of dp.data || []) dagplan[r.datum] = r;
   settings = s.data || {};
   people = p.data;
+  for (const sel of document.querySelectorAll(".uploader .van")){
+    const namen = [...new Set([me.naam, ...people.filter(x => x.rol !== "deelnemer").map(x => x.naam)].filter(Boolean))];
+    const keuze = sel.value || me.naam;
+    sel.innerHTML = namen.map(n => `<option${n === keuze ? " selected" : ""}>${esc(n)}</option>`).join("");
+    sel.closest(".namens").hidden = !canSetup || namen.length < 2;
+  }
   weken = {}; for (const r of w.data) weken[r.week] = r.oefeningen || [];
   recent = l.data.map(r => ({...r.data, datum: r.datum}));
   log = recent.find(r => r.datum === day) || {};
@@ -1190,6 +1196,7 @@ for (const box of document.querySelectorAll(".uploader")){
     <p class="note gekozen"></p>
     <label>Tekstje (mag ook alleen tekst zijn)<textarea class="tekst" rows="2" maxlength="280" placeholder="Goed bezig pap, we zijn trots op je!"></textarea></label>
     <div class="row"><button type="button" class="rec"${AUDIO && navigator.mediaDevices ? "" : " hidden"}>Spraakbericht inspreken</button></div>
+    <label class="namens" hidden>Van wie?<select class="van"></select></label>
     <details class="opties">
       <summary>Bij welk moment? <span class="note">Nu: Altijd. Niets kiezen is prima.</span></summary>
       <div class="row">
@@ -1257,7 +1264,7 @@ for (const box of document.querySelectorAll(".uploader")){
     const txt = tekst.value.trim() || null;
     let ok = 0;
     if (!items.length && txt){ // alleen tekst
-      const {error} = await sb.from("filmpjes").insert({soort: "tekst", tekst: txt, titel: "Tekst", van: me.naam || null, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value});
+      const {error} = await sb.from("filmpjes").insert({soort: "tekst", tekst: txt, titel: "Tekst", van: (box.querySelector(".van").value || me.naam) || null, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value});
       if (error) msg.textContent = `Versturen lukte niet (${error.message}).`; else ok++;
     }
     for (const [i, it] of items.entries()){
@@ -1272,7 +1279,7 @@ for (const box of document.querySelectorAll(".uploader")){
         const ext = {"video/mp4":"mp4","video/quicktime":"mov","image/jpeg":"jpg","image/png":"png","image/heic":"heic","audio/mp4":"m4a","audio/x-m4a":"m4a","audio/mpeg":"mp3","audio/webm":"webm"}[type] || (f.name?.split(".").pop() || "bin").toLowerCase();
         const pad = crypto.randomUUID() + "." + ext;
         const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: type});
-        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.audio ? it.naam : null, van: me.naam || null, soort, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value, tekst: txt});
+        const row = up.error ? up : await sb.from("filmpjes").insert({pad, titel: it.audio ? it.naam : null, van: (box.querySelector(".van").value || me.naam) || null, soort, voor: voor.value, week: weekSel.value === "" ? null : +weekSel.value, tekst: txt});
         if (row.error) msg.textContent = `Uploaden van ${it.naam} lukte niet (${row.error.message}).`; else ok++;
       } catch {
         msg.textContent = `${it.naam} is langer dan ${MAX_SEC/60} minuten. Kort het eerst in via Foto's.`;
