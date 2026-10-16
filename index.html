@@ -204,11 +204,6 @@ input,select,textarea{font-size:max(16px,1em)!important}
           <button class="primary" type="submit">Inloggen</button>
           <button type="button" id="signup">Eerste keer? Account maken</button>
         </div>
-        <button type="button" class="link" id="forgot">Wachtwoord vergeten?</button>
-      </form>
-      <form id="newPassForm" hidden>
-        <label>Nieuw wachtwoord<input id="newPass" type="password" autocomplete="new-password" minlength="8" required></label>
-        <button class="primary" type="submit">Wachtwoord opslaan</button>
       </form>
       <p class="note" id="loginMsg"></p>
     </div>
@@ -381,9 +376,6 @@ input,select,textarea{font-size:max(16px,1em)!important}
 <canvas id="confetti" hidden></canvas>
 
 <script>
-// Binnengekomen via de link uit de wachtwoordmail? Supabase zet dat in de URL (#...type=recovery); eerst lezen, de client wist het.
-let herstel = /type=recovery/.test(location.hash);
-const herstelFout = /error_code=/.test(location.href);
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
 const iso = d => d.toLocaleDateString("sv-SE"); // yyyy-mm-dd, lokale tijd
@@ -1345,47 +1337,11 @@ $("signup").onclick = async () => {
   if (error) $("loginMsg").textContent = /registered/i.test(error.message) ? "Dit e-mailadres heeft al een account. Tik op Inloggen." : "Account maken lukte niet: " + error.message;
   else if (!data.session) $("loginMsg").textContent = "Account gemaakt, maar Supabase vraagt nog om een bevestigingsmail. Zet 'Confirm email' uit (zie uitleg).";
 };
-// Wachtwoord vergeten: Supabase mailt een link terug naar deze pagina, daar kiest hij een nieuw wachtwoord.
-$("forgot").onclick = async () => {
-  const email = $("loginEmail").value.trim().toLowerCase(), b = $("forgot");
-  if (!email){ $("loginMsg").textContent = "Vul eerst je e-mailadres in en tik dan opnieuw op Wachtwoord vergeten."; $("loginEmail").focus(); return; }
-  b.disabled = true;
-  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.origin + location.pathname});
-  b.disabled = false;
-  $("loginMsg").textContent = !error ? `Er is een mail gestuurd naar ${email} (kijk ook bij spam). Tik op de link in die mail en kies een nieuw wachtwoord.`
-    : /rate|seconds|security/i.test(error.message) ? "Er is net al een mail verstuurd. Wacht een paar minuten en probeer het dan opnieuw."
-    : "Mail versturen lukte niet: " + error.message;
-};
-function toonNieuwWachtwoord(){
-  show("login");
-  $("loginForm").hidden = true; $("newPassForm").hidden = false;
-  $("viewLogin").querySelector("h2").textContent = "Kies een nieuw wachtwoord";
-  $("viewLogin").querySelector("h2 + p").hidden = true;
-  $("loginMsg").textContent = "Minstens 8 tekens. Daarna log je voortaan met dit wachtwoord in.";
-  $("newPass").focus();
-}
-$("newPassForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const {error} = await sb.auth.updateUser({password: $("newPass").value});
-  if (error){
-    $("loginMsg").textContent = /different/i.test(error.message) ? "Dit is je oude wachtwoord. Kies een ander." : "Opslaan lukte niet: " + error.message;
-    return;
-  }
-  herstel = false; history.replaceState(null, "", location.pathname);
-  $("loginForm").hidden = false; $("newPassForm").hidden = true;
-  await boot();
-  showMedia("Wachtwoord opgeslagen", null, "Gebruik je de app vanaf je beginscherm? Log daar in met je nieuwe wachtwoord.");
-});
 
 let booted = false;
 async function boot(){
   const {data:{session}} = await sb.auth.getSession();
-  if (!session){
-    show("login");
-    if (herstelFout) $("loginMsg").textContent = "Deze link werkt niet meer (verlopen of al gebruikt). Vul je e-mailadres in en tik opnieuw op Wachtwoord vergeten.";
-    return;
-  }
-  if (herstel){ toonNieuwWachtwoord(); return; }
+  if (!session){ show("login"); return; }
   if (booted) return; booted = true;
   // Eigen rij (beheer ziet alle rijen, dus filteren op e-mail).
   const {data: rij} = await sb.from("toegang").select().eq("email", session.user.email.toLowerCase()).maybeSingle();
@@ -1402,10 +1358,7 @@ async function boot(){
   show(me.rol === "familie" ? "family" : "today");
   await loadAll();
 }
-sb.auth.onAuthStateChange(ev => {
-  if (ev === "PASSWORD_RECOVERY") herstel = true;
-  if (ev === "SIGNED_IN" || ev === "PASSWORD_RECOVERY") setTimeout(boot);
-});
+sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_IN") setTimeout(boot); });
 // Nieuwe versie online? Dan vanzelf herladen, anders blijft een app op het beginscherm dagen op de oude versie.
 // Vergelijkt de scripts en de stijl van deze pagina met wat er nu online staat.
 const eigenCode = [...document.querySelectorAll("script:not([src]), style")].map(e => e.textContent);
