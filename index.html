@@ -438,7 +438,7 @@ function tasksFor(date){
   const w = planWeek(weekOf(date));
   const plan = w == null ? [] : weken[w].filter(t => !["puzzel", "foto"].includes(catOf(t)));
   if (geldigWoord(date)) plan.push({id: "woord", naam: "Woord van de dag", keer: 1, soort: "puzzel"});
-  if (planVan(date).opdracht) plan.push({id: "foto", naam: "Foto van de dag", keer: 1, soort: "foto"});
+  if (planVan(date).opdracht) plan.push({id: "fotodag", naam: "Foto van de dag", keer: 1, soort: "foto"});
   return plan;
 }
 function isKlaar(l, date){ return tasksFor(date).every(t => (l[t.id]||0) >= t.keer) && (l.water||0) >= waterGoal(); }
@@ -489,8 +489,9 @@ async function loadAll(){
   log = recent.find(r => r.datum === day) || {};
   const opdrachtFotos = recent.map(r => r.foto).filter(Boolean);
   if (opdrachtFotos.length){
-    const {data} = await sb.storage.from("filmpjes").createSignedUrls(opdrachtFotos, 86400);
-    for (const d of data || []) if (d.signedUrl) fotoUrls[d.path] = d.signedUrl;
+    const {data, error} = await sb.storage.from("filmpjes").createSignedUrls(opdrachtFotos, 86400);
+    for (const d of data || []) if (d.signedUrl) fotoUrls[d.path] = d.signedUrl; else fotoFout[d.path] = d.error || "geen leesrechten";
+    if (error) for (const pad of opdrachtFotos) fotoFout[pad] = error.message;
   }
   // Filmpjes staan privé; tijdelijke links vooraf maken zodat ze direct kunnen spelen.
   videos = f.data;
@@ -742,12 +743,14 @@ let dagplan = {}; // datum -> {woord, omschrijving, opdracht}, ingevuld door de 
 const planVan = d => dagplan[d] || {};
 const opdrachtVanDaag = () => planVan(day).opdracht || "";
 let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
+let fotoFout = {}; // pad -> waarom er geen link kwam
 function renderFotoOpdracht(t){
   const card = document.createElement("div");
   const klaar = !!log.foto, opdracht = log.opdracht || opdrachtVanDaag();
   card.className = "card task" + (klaar ? " alldone" : "");
   card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Maak een foto van</p><p class="opdracht">${esc(opdracht)}</p>`;
   if (klaar && fotoUrls[log.foto]) card.insertAdjacentHTML("beforeend", `<img class="fotoklaar" src="${fotoUrls[log.foto]}" alt="${esc(opdracht)}">`);
+  else if (klaar) card.insertAdjacentHTML("beforeend", `<p class="note">De foto is gemaakt, maar laden lukte niet (${esc(fotoFout[log.foto] || "onbekend")}).</p>`);
   if (!kanAfvinken()){ if (!klaar) card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
   const lab = document.createElement("label");
   lab.className = klaar ? "link" : "big";
