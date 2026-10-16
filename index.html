@@ -1359,8 +1359,30 @@ async function boot(){
   await loadAll();
 }
 sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_IN") setTimeout(boot); });
-// Terugkomen in de app (of na middernacht): alles opnieuw ophalen.
-document.addEventListener("visibilitychange", () => { if (!document.hidden && ready) loadAll(); });
+// Nieuwe versie online? Dan vanzelf herladen, anders blijft een app op het beginscherm dagen op de oude versie.
+// Vergelijkt de scripts en de stijl van deze pagina met wat er nu online staat.
+const eigenCode = [...document.querySelectorAll("script:not([src]), style")].map(e => e.textContent);
+async function nieuweVersie(){
+  try {
+    const r = await fetch(location.pathname, {cache: "no-store"});
+    if (!r.ok) return false;
+    const html = (await r.text()).replace(/\r\n?/g, "\n");
+    return eigenCode.some(c => !html.includes(c));
+  } catch { return false; }
+}
+// Niet herladen midden in iets: een open beloning, typen, opnemen of een foto/filmpje dat nog verstuurd wordt.
+const bezig = () => !$("reward").hidden || !!document.activeElement?.matches("input, textarea, select")
+  || !!document.querySelector(".uploader .send:not([hidden]), .uploader .rec.on")
+  || [...document.querySelectorAll("input[type=file]")].some(i => i.files.length);
+// Terugkomen in de app (of na middernacht): eerst kijken of er een nieuwe versie is, anders alles opnieuw ophalen.
+// Alleen na minstens een minuut weg, zodat even de camera openen nooit een herlaadbeurt geeft.
+let wegSinds = 0;
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden){ wegSinds = Date.now(); return; }
+  if (!ready) return;
+  if (Date.now() - wegSinds > 60000 && !bezig() && await nieuweVersie() && !bezig()){ location.reload(); return; }
+  loadAll();
+});
 boot();
 </script>
 </body>
