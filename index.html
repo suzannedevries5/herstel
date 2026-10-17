@@ -260,7 +260,7 @@ input,select,textarea{font-size:max(16px,1em)!important}
           <div class="big" id="litres">0 L <small>van 2 L</small></div>
           <p id="waterLeft"></p>
           <div class="waterbtns">
-            <button class="primary" id="waterPlus">+ glas (250 ml)</button>
+            <button class="primary" id="waterPlus">+ glas (125 ml)</button>
             <button id="waterMin" aria-label="Glas eraf">−</button>
           </div>
         </div>
@@ -381,7 +381,7 @@ const $ = id => document.getElementById(id);
 const iso = d => d.toLocaleDateString("sv-SE"); // yyyy-mm-dd, lokale tijd
 const addDays = (s, n) => { const d = new Date(s+"T12:00"); d.setDate(d.getDate()+n); return iso(d); };
 const diffDays = (a, b) => Math.round((new Date(a+"T12:00") - new Date(b+"T12:00"))/864e5);
-const MAXWEEK = 16, GLAS = 250;
+const MAXWEEK = 16, GLAS = 125;
 const cheers = ["Top gedaan!", "Weer een stap vooruit!", "Kanjer!", "Zo kom je er wel!", "Lekker bezig!"];
 // Bij welk moment een beloning hoort. "altijd" is de reserve voor elk moment behalve goedemorgen.
 const VOOR = {
