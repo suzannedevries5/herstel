@@ -106,6 +106,8 @@ details.group>summary{cursor:pointer;font-weight:700;font-size:17px;padding-bloc
 .msg img,.msg .ico{width:48px;height:48px;flex:none;border-radius:8px;object-fit:cover;display:grid;place-items:center;font-size:24px;background:var(--glass)}
 .msg .grow{flex:1 1 0;min-width:0}
 .msg .grow b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gezien{width:100%;background:none;border:0;border-radius:0;color:var(--ink);font-weight:400;text-align:left;padding:8px 0;cursor:pointer}
+.gezien small{color:var(--muted);display:block}
 .msg .acts{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;flex:0 1 auto}
 @media (max-width:520px){.msg{flex-wrap:wrap}.msg .acts{flex-basis:100%;justify-content:flex-start}}
 .uploader.drop{outline:3px dashed var(--brand);outline-offset:6px;border-radius:8px}
@@ -278,6 +280,12 @@ input,select,textarea{font-size:max(16px,1em)!important}
     <div class="card" id="albumCard" hidden>
       <h2>Papa's fotoalbum</h2>
       <div class="album" id="album"></div>
+    </div>
+
+    <div class="card" id="gezienCard" hidden>
+      <h2 id="gezienTitel">Je berichtjes</h2>
+      <p class="note" id="gezienUitleg"></p>
+      <div id="gezien"></div>
     </div>
   </section>
 
@@ -683,6 +691,7 @@ function renderToday(){
   renderMood();
   renderSurvived();
   renderAlbum();
+  renderGezien();
   renderHistory();
 }
 
@@ -776,6 +785,28 @@ function renderAlbum(){
   $("albumCard").hidden = !fotos.length;
   $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}</small></button>`).join("");
   $("album").onclick = e => { const b = e.target.closest("button[data-pad]"); if (b) showMedia(b.dataset.titel, {soort: "foto", url: fotoUrls[b.dataset.pad]}); };
+}
+
+// Terugkijken wat papa al kreeg: alles uit "gezien" in zijn logboek, plus de berichtjes van "Operatie overleefd".
+function renderGezien(){
+  const wanneer = {};
+  for (const r of [...recent.filter(r => r.datum !== day), {...log, datum: day}]) for (const id of r.gezien || []) if (!wanneer[id] || r.datum > wanneer[id]) wanneer[id] = r.datum;
+  const ov = overleefdOp();
+  if (ov) for (const v of videos) if (v.voor === "overleefd" && !wanneer[v.id]) wanneer[v.id] = ov;
+  const lijst = videos.filter(v => wanneer[v.id]).sort((a, b) => wanneer[a.id] < wanneer[b.id] ? 1 : wanneer[a.id] > wanneer[b.id] ? -1 : 0);
+  $("gezienCard").hidden = !lijst.length;
+  $("gezienTitel").textContent = kanAfvinken() ? "Je berichtjes" : "Wat papa al gekregen heeft";
+  $("gezienUitleg").textContent = kanAfvinken() ? "Alles wat je al gekregen hebt. Tik erop om het nog eens te bekijken." : "Wat hij al gezien heeft, nieuwste bovenaan.";
+  $("gezien").innerHTML = lijst.map(v => {
+    const kop = v.soort === "tekst" ? v.tekst.slice(0, 70) + (v.tekst.length > 70 ? "…" : "") : `${SOORT[v.soort] || "Filmpje"}${v.van ? " van " + v.van : ""}`;
+    const thumb = v.soort === "foto" ? `<img src="${v.url}" alt="" loading="lazy">` : `<span class="ico" aria-hidden="true">${ICO[v.soort] || ICO.video}</span>`;
+    const datum = new Date(wanneer[v.id] + "T12:00").toLocaleDateString("nl-NL", {weekday: "short", day: "numeric", month: "short"});
+    return `<button type="button" class="item msg gezien" data-id="${esc(v.id)}">${thumb}<span class="grow"><b>${esc(kop)}</b><small>${v.tekst && v.soort !== "tekst" ? esc(v.tekst.slice(0, 60)) + " · " : ""}${datum}</small></span></button>`;
+  }).join("");
+  $("gezien").onclick = e => {
+    const b = e.target.closest("button[data-id]"), v = b && videos.find(x => String(x.id) === b.dataset.id);
+    if (v) showMedia(v.soort === "tekst" ? "" : SOORT[v.soort] || "", v);
+  };
 }
 
 /* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
