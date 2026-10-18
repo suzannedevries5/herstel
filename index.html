@@ -108,6 +108,8 @@ details.group>summary{cursor:pointer;font-weight:700;font-size:17px;padding-bloc
 .msg .grow b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gezien{width:100%;background:none;border:0;border-radius:0;color:var(--ink);font-weight:400;text-align:left;padding:8px 0;cursor:pointer}
 .gezien small{color:var(--muted);display:block}
+.gezienop{color:var(--done);font-weight:700}
+.nognieuw{color:var(--brand);font-weight:700}
 .msg .acts{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;flex:0 1 auto}
 @media (max-width:520px){.msg{flex-wrap:wrap}.msg .acts{flex-basis:100%;justify-content:flex-start}}
 .uploader.drop{outline:3px dashed var(--brand);outline-offset:6px;border-radius:8px}
@@ -788,11 +790,16 @@ function renderAlbum(){
 }
 
 // Terugkijken wat papa al kreeg: alles uit "gezien" in zijn logboek, plus de berichtjes van "Operatie overleefd".
-function renderGezien(){
+// Per bericht de laatste dag dat papa het kreeg (id -> datum). Tekstberichten worden niet bijgehouden.
+function gezienOp(){
   const wanneer = {};
   for (const r of [...recent.filter(r => r.datum !== day), {...log, datum: day}]) for (const id of r.gezien || []) if (!wanneer[id] || r.datum > wanneer[id]) wanneer[id] = r.datum;
   const ov = overleefdOp();
   if (ov) for (const v of videos) if (v.voor === "overleefd" && !wanneer[v.id]) wanneer[v.id] = ov;
+  return wanneer;
+}
+function renderGezien(){
+  const wanneer = gezienOp();
   const lijst = videos.filter(v => wanneer[v.id]).sort((a, b) => wanneer[a.id] < wanneer[b.id] ? 1 : wanneer[a.id] > wanneer[b.id] ? -1 : 0);
   $("gezienCard").hidden = !lijst.length;
   $("gezienTitel").textContent = kanAfvinken() ? "Je berichtjes" : "Wat papa al gekregen heeft";
@@ -1034,30 +1041,33 @@ function renderSetup(){
 let soortFilter = "", dichtGroepen = new Set();
 const ICO = {video:"🎬", audio:"🎙️", tekst:"💬"};
 function renderMsgs(){
-  const tel = k => videos.filter(v => !k || v.soort === k).length;
-  $("soortFilter").innerHTML = [["", "Alles"], ...Object.entries(SOORT)].map(([k, l]) => `<button type="button" class="${k === soortFilter ? "primary" : ""}" data-s="${k}">${l} (${tel(k)})</button>`).join("");
+  const wanneer = gezienOp(), nieuw = v => v.soort !== "tekst" && !wanneer[v.id];
+  const past = (v, k) => !k || (k === "nieuw" ? nieuw(v) : v.soort === k);
+  const tel = k => videos.filter(v => past(v, k)).length;
+  $("soortFilter").innerHTML = [["", "Alles"], ["nieuw", "Nog niet gezien"], ...Object.entries(SOORT)].map(([k, l]) => `<button type="button" class="${k === soortFilter ? "primary" : ""}" data-s="${k}">${l} (${tel(k)})</button>`).join("");
   $("soortFilter").onclick = e => { const b = e.target.closest("button"); if (b){ soortFilter = b.dataset.s; renderMsgs(); } };
   const mine = videos.filter(v => v.van === me.naam).length;
   $("familyCount").textContent = videos.length ? `${videos.length} berichtjes${mine ? `, ${mine} van jou` : ""}` : "";
   const ve = $("videos"); ve.innerHTML = "";
   if (!videos.length){ ve.innerHTML = '<p class="note">Nog geen berichtjes. Zonder bericht krijgt hij confetti.</p>'; return; }
-  const lijst = videos.filter(v => !soortFilter || v.soort === soortFilter).slice().reverse();
+  const lijst = videos.filter(v => past(v, soortFilter)).slice().reverse();
   for (const [cat, label] of Object.entries(VOOR)){
     const items = lijst.filter(v => (v.voor || "altijd") === cat);
     if (!items.length) continue;
     const d = document.createElement("details"); d.className = "group"; d.open = !dichtGroepen.has(cat);
     d.innerHTML = `<summary>${label} <span class="note">(${items.length})</span></summary>`;
     d.ontoggle = () => { if (d.open) dichtGroepen.delete(cat); else dichtGroepen.add(cat); };
-    for (const v of items) d.appendChild(msgRow(v));
+    for (const v of items) d.appendChild(msgRow(v, wanneer[v.id]));
     ve.appendChild(d);
   }
 }
-function msgRow(v){
+function msgRow(v, gezien){
   const r = document.createElement("div"); r.className = "item msg";
   const kop = v.soort === "tekst" ? v.tekst.slice(0, 70) + (v.tekst.length > 70 ? "…" : "") : (v.tekst || v.titel || `${SOORT[v.soort] || "Filmpje"}${v.van ? " van " + v.van : ""}`);
   const datum = v.gemaakt ? new Date(v.gemaakt).toLocaleDateString("nl-NL", {day: "numeric", month: "short"}) : "";
   const thumb = v.soort === "foto" ? `<img src="${v.url}" alt="" loading="lazy">` : `<span class="ico" aria-hidden="true">${ICO[v.soort] || ICO.video}</span>`;
-  const info = [SOORT[v.soort] || "Filmpje", v.van && `van ${esc(v.van)}`, v.tekst && v.soort !== "tekst" && "met tekst", v.week != null && (v.week === 0 ? "voor de OK" : "week " + v.week), datum].filter(Boolean).join(" · ");
+  const info = [SOORT[v.soort] || "Filmpje", v.van && `van ${esc(v.van)}`, v.tekst && v.soort !== "tekst" && "met tekst", v.week != null && (v.week === 0 ? "voor de OK" : "week " + v.week), datum].filter(Boolean).join(" · ")
+    + (gezien ? ` · <span class="gezienop">✓ papa zag het ${new Date(gezien + "T12:00").toLocaleDateString("nl-NL", {weekday: "short", day: "numeric", month: "short"})}</span>` : v.soort !== "tekst" ? ' · <span class="nognieuw">nog niet gezien</span>' : "");
   r.innerHTML = `${thumb}<div class="grow"><b>${esc(kop)}</b><small>${info}</small></div><div class="acts">${canSetup ? `<select class="mv" aria-label="Moment">${voorOptions(v.voor)}</select><select class="wk" aria-label="Week">${weekOptions(v.week)}</select>` : ""}<button class="link">Bekijken</button>${canSetup ? '<button class="link danger">Verwijderen</button>' : ""}</div>`;
   const [view, del] = r.querySelectorAll("button");
   view.onclick = () => showMedia(v.soort === "tekst" ? "" : SOORT[v.soort] || "", v);
