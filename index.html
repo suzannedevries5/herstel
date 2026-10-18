@@ -416,18 +416,22 @@ function seenRecently(){
   return seen;
 }
 // Eerst iets voor dit moment én deze week, dan dit moment, dan "Altijd", dan alles behalve goedemorgen.
+// Nieuw gaat altijd voor: eerst alles langs wat papa nog nooit zag, pas daarna wat hij langer dan 7 dagen geleden zag.
 function pickMedia(cat){
-  const seen = seenRecently(), w = weekOf(day);
-  const ok = v => (v.week == null || v.week === w) && (v.soort === "tekst" || !seen.has(v.id));
+  const seen = seenRecently(), ooit = gezienOp(), w = weekOf(day);
   const tiers = [v => v.voor === cat && v.week === w, v => v.voor === cat];
   // Speciale momenten krijgen nooit een willekeurig ander bericht, en worden zelf nooit als reserve gebruikt.
   const SPECIAAL = ["ochtend", "operatiedag"];
   if (!SPECIAAL.includes(cat)) tiers.push(v => v.voor === "altijd" && v.week === w, v => v.voor === "altijd", v => ![...SPECIAAL, "overleefd"].includes(v.voor));
-  for (const tier of tiers){
-    const pool = videos.filter(v => ok(v) && tier(v));
-    if (pool.length) return pool[Math.floor(Math.random()*pool.length)];
-  }
-  return null;
+  const kies = ok => {
+    for (const tier of tiers){
+      const pool = videos.filter(v => (v.week == null || v.week === w) && ok(v) && tier(v));
+      if (pool.length) return pool[Math.floor(Math.random()*pool.length)];
+    }
+    return null;
+  };
+  // Tekst wordt niet bijgehouden, dus telt nooit als nieuw (anders kwam die steeds eerst).
+  return kies(v => v.soort !== "tekst" && !ooit[v.id]) || kies(v => v.soort === "tekst" || !seen.has(v.id));
 }
 // Alleen wat papa zelf ziet telt als "gezien".
 const markSeen = (l, m) => me.rol === "deelnemer" && m && m.soort !== "tekst" ? {...l, gezien: [...(l.gezien || []), m.id]} : l;
