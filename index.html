@@ -63,6 +63,7 @@ button.link.danger{color:var(--danger)}
 button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .wgrid{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,52px));gap:6px;justify-content:center}
 .wgrid.lang{gap:4px}
+.prow input.onbekend{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
 .wgrid.lang .wtile{font-size:19px;border-radius:6px}
 .wgrid.heellang{gap:3px}
 .wgrid.heellang .wtile{font-size:15px;border-radius:4px;border-width:1px}
@@ -898,6 +899,18 @@ const WOORDEN_SUG = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAA
 const POGINGEN = 6;
 const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 const woordOp = d => norm(planVan(d).woord || "").replace(/[^A-Z]/g, "");
+// Het woord met spaties, zoals "GOED ZO": de spaties staan bij papa al vast in het rooster.
+const vormVan = tekst => norm(tekst || "").replace(/[^A-Z ]/g, "").trim().split(/ +/).filter(Boolean);
+const woordVorm = d => vormVan(planVan(d).woord).join(" ");
+// Nederlands woordenboek (OpenTaal, zie woorden-LICENSE.txt): pas geladen als het nodig is.
+// null = nog aan het laden, false = laden mislukt (dan wordt niets geweigerd).
+let woordenboek = null, wbLaden = null;
+function laadWoordenboek(){
+  return wbLaden ||= fetch("woorden.txt").then(r => r.ok ? r.text() : Promise.reject(r.status))
+    .then(t => { woordenboek = new Set(t.split("\n")); }).catch(() => { woordenboek = false; });
+}
+// Welke losse woorden niet in het woordenboek staan (leeg als het woordenboek er niet is).
+const onbekend = delen => woordenboek ? delen.filter(w => !woordenboek.has(w)) : [];
 const geldigWoord = d => woordOp(d).length >= 3;
 const woordVanDaag = () => woordOp(day);
 const clueVanDaag = () => planVan(day).omschrijving || "";
@@ -911,17 +924,21 @@ function score(gok, woord){
 const RANG = {mis: 1, bijna: 2, goed: 3};
 let invoer = "";
 function renderPuzzle(t){
-  const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel;
+  const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel, delen = woordVorm(day).split(" ");
+  if (kanAfvinken() && !klaar) laadWoordenboek();
+  // Na deze letterposities komt een spatie.
+  const spatieNa = new Set(delen.slice(0, -1).map((_, i) => delen.slice(0, i + 1).join("").length - 1));
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
   const clue = clueVanDaag();
-  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad het woord van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad ${delen.length > 1 ? `de ${delen.length} woorden` : "het woord"} van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
   const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 12 ? " heellang" : woord.length > 7 ? " lang" : "");
   grid.style.setProperty("--n", woord.length);
+  if (spatieNa.size) grid.style.gridTemplateColumns = [...woord].map((_, i) => "minmax(0,52px)" + (spatieNa.has(i) ? " 10px" : "")).join(" ");
   for (let r = 0; r < POGINGEN; r++){
     const g = gokken[r], s = g ? score(g, woord) : null;
     const tekst = g || (r === gokken.length && !klaar ? invoer : "");
-    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>`);
+    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>${spatieNa.has(i) ? "<div></div>" : ""}`);
   }
   card.appendChild(grid);
   // De omschrijving is een hint: pas zichtbaar als hij erom vraagt (of als het woord klaar is).
@@ -935,7 +952,7 @@ function renderPuzzle(t){
   }
   if (klaar){
     const gewonnen = gokken.at(-1) === woord;
-    card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woord}.`}</b> Morgen een nieuw woord.</p>`);
+    card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woordVorm(day)}.`}</b> Morgen een nieuw woord.</p>`);
     card.appendChild(reactieBlok("woord"));
     return card;
   }
@@ -960,10 +977,17 @@ function toets(t, k){
   const woord = woordVanDaag();
   if (k !== "OK"){ if (invoer.length < woord.length){ invoer += k; renderToday(); } return; }
   if (invoer.length < woord.length){ toast(`Typ eerst ${woord.length} letters`); return; }
+  // Alleen bestaande Nederlandse woorden (per los woord); het goede antwoord telt altijd.
+  if (invoer !== woord){
+    if (woordenboek === null){ laadWoordenboek(); toast("Woordenboek wordt nog geladen, probeer het zo nog eens"); return; }
+    let i = 0;
+    const fout = onbekend(woordVorm(day).split(" ").map(d => invoer.slice(i, i += d.length)));
+    if (fout.length){ toast(`${fout.join(" ")} staat niet in het woordenboek`); return; }
+  }
   const pogingen = [...(log.pogingen || []), invoer];
   invoer = "";
   const gewonnen = pogingen.at(-1) === woord, op = pogingen.length >= POGINGEN;
-  if (gewonnen || op) save({pogingen, puzzel: true, [t.id]: 1}, {cat: "puzzel", title: gewonnen ? "Geraden!" : "Bijna!", text: gewonnen ? "" : `Het woord was ${woord}. Morgen een nieuw woord.`});
+  if (gewonnen || op) save({pogingen, puzzel: true, [t.id]: 1}, {cat: "puzzel", title: gewonnen ? "Geraden!" : "Bijna!", text: gewonnen ? "" : `Het woord was ${woordVorm(day)}. Morgen een nieuw woord.`});
   else { log = {...log, pogingen}; renderToday(); saveLog(log); }
 }
 
@@ -1167,7 +1191,20 @@ function renderPlan(){
   const vandaag = iso(new Date()), byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
   const komend = Array.from({length: 21}, (_, i) => addDays(vandaag, i));
   $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="40" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
-  $("planRows").onchange = e => { const r = e.target.closest(".prow"); if (r) bewaarDag(r.dataset.d, r.querySelector(".pw").value, r.querySelector(".pc").value, r.querySelector(".po").value); };
+  // Woord niet in het woordenboek: rood randje, en bij opslaan eerst vragen.
+  const markeer = inp => { const fout = onbekend(vormVan(inp.value)); inp.classList.toggle("onbekend", !!fout.length); inp.title = fout.length ? `Niet in het woordenboek: ${fout.join(", ")}` : ""; return fout; };
+  laadWoordenboek().then(() => { for (const inp of $("planRows").querySelectorAll(".pw")) markeer(inp); });
+  $("planRows").oninput = e => { if (e.target.matches(".pw")) markeer(e.target); };
+  $("planRows").onchange = e => {
+    const r = e.target.closest(".prow"); if (!r) return;
+    if (e.target.matches(".pw")){
+      const fout = markeer(e.target);
+      if (fout.length && !confirm(`"${fout.join(", ")}" staat niet in het Nederlandse woordenboek. Papa kan dan alleen dat woord zelf als poging gebruiken, andere niet-bestaande woorden worden geweigerd.\n\nToch gebruiken?`)){
+        e.target.value = planVan(r.dataset.d).woord || ""; markeer(e.target); return;
+      }
+    }
+    bewaarDag(r.dataset.d, r.querySelector(".pw").value, r.querySelector(".pc").value, r.querySelector(".po").value);
+  };
   // Geweest: wat er gepland was en hoe het ging, nieuwste bovenaan.
   const geweest = Array.from({length: 30}, (_, i) => addDays(vandaag, -1 - i)).filter(d => dagplan[d] || byDate[d]?.puzzel || byDate[d]?.foto);
   $("planPast").hidden = !geweest.length;
