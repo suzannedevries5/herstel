@@ -70,6 +70,10 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .wgrid.heellang .wtile{font-size:15px;border-radius:4px;border-width:1px}
 .wtile{aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--line);border-radius:8px;font:800 26px var(--display);color:var(--ink)}
 .wtile.vol{border-color:var(--muted)}
+.wtile.hulpletter{color:var(--muted);border-style:dashed;border-color:var(--done)}
+.hulp{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.hulp > button{align-self:flex-start}
+.hulpvraag{font:600 20px/1.35 var(--display)!important;color:var(--ink)!important;margin:0}
 .wtile.goed,.wkbd .goed{background:var(--done);border-color:var(--done);color:#fff}
 .wtile.bijna,.wkbd .bijna{background:var(--sun);border-color:var(--sun);color:#15262B}
 .wtile.mis,.wkbd .mis{background:var(--muted);border-color:var(--muted);color:var(--bg)}
@@ -924,6 +928,93 @@ function score(gok, woord){
 }
 const RANG = {mis: 1, bijna: 2, goed: 3};
 let invoer = "";
+// Letter erbij: na een goed opgelost raadsel of een goede rekensom één letter op een plek die nog niet goed geraden is.
+// Maximaal 3 per dag, en er blijft altijd minstens één plek over om zelf te raden.
+const MAXHULP = 3;
+const RAADSELS = [
+  {v: "Wat heeft tanden, maar kan niet bijten?", a: ["kam", "zaag", "rits", "hark"]},
+  {v: "Wat wordt natter naarmate het meer droogt?", a: ["handdoek", "theedoek"]},
+  {v: "Wat heeft een hals, maar geen hoofd?", a: ["fles", "trui", "gitaar"]},
+  {v: "Wat heeft wijzers, maar kan niet wijzen?", a: ["klok", "horloge", "wekker"]},
+  {v: "Wat gaat altijd omhoog, maar komt nooit meer naar beneden?", a: ["leeftijd", "je leeftijd"]},
+  {v: "Wat heeft een oog, maar kan niet zien?", a: ["naald", "orkaan", "storm"]},
+  {v: "Hoe meer je ervan weghaalt, hoe groter het wordt. Wat is het?", a: ["gat", "kuil", "put"]},
+  {v: "Wat kun je wel vangen, maar niet gooien?", a: ["verkoudheid", "griep", "kou"]},
+  {v: "Wat heeft vier poten, maar kan niet lopen?", a: ["tafel", "stoel", "bed", "bank"]},
+  {v: "Wat breekt al als je zijn naam zegt?", a: ["stilte"]},
+  {v: "Wat is van jou, maar gebruiken anderen veel vaker dan jij?", a: ["naam", "je naam", "mijn naam"]},
+  {v: "Wat heeft een bed, maar slaapt nooit?", a: ["rivier", "beek", "kanaal"]},
+  {v: "Wat heeft een duim en vier vingers, maar leeft niet?", a: ["handschoen", "want"]},
+  {v: "Wat geeft altijd antwoord, maar alleen als jij eerst iets roept?", a: ["echo", "de echo"]},
+  {v: "Welke letter staat in het midden van Parijs?", a: ["r", "de r", "letter r"]},
+  {v: "Welke maand heeft 28 dagen?", a: ["alle", "allemaal", "alle maanden", "elke maand", "iedere maand"]},
+  {v: "Wat is altijd voor je, maar kun je nooit zien?", a: ["toekomst", "de toekomst"]},
+  {v: "Wat heeft een kop, maar geen hersens?", a: ["spijker", "lucifer", "schroef", "kool"]},
+  {v: "Wat heeft een kop en een munt, maar geen lijf?", a: ["muntstuk", "munt", "geldstuk", "euro"]},
+  {v: "Wat heeft bladeren, maar is geen boom?", a: ["boek", "krant", "tijdschrift", "schrift"]},
+  {v: "Wat gaat de hele wereld rond, maar blijft in een hoekje zitten?", a: ["postzegel", "zegel"]},
+  {v: "Wat moet je eerst breken voordat je het kunt gebruiken?", a: ["ei", "een ei", "eieren"]},
+  {v: "Wat zit vol gaatjes, maar houdt toch water vast?", a: ["spons"]},
+  {v: "Wat heeft een rug, maar kan niet liggen?", a: ["boek", "stoel"]},
+  {v: "Wat heeft een mond, maar eet nooit?", a: ["rivier", "fles", "tunnel"]},
+  {v: "Hoe meer er van is, hoe minder je ziet. Wat is het?", a: ["donker", "duisternis", "mist"]},
+];
+const normAntw = x => norm(String(x)).toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/^(een|de|het) /, "").trim();
+// Rekensom: optellen, aftrekken of vermenigvuldigen, niet te moeilijk.
+function rekensom(){
+  const r = (a, b) => a + Math.floor(Math.random() * (b - a + 1)), soort = r(0, 2);
+  if (soort === 0){ const a = r(12, 68), b = r(11, 31); return {v: `Hoeveel is ${a} + ${b}?`, a: [a + b], som: true}; }
+  if (soort === 1){ const a = r(40, 99), b = r(11, 38); return {v: `Hoeveel is ${a} − ${b}?`, a: [a - b], som: true}; }
+  const a = r(3, 9), b = r(4, 12); return {v: `Hoeveel is ${a} × ${b}?`, a: [a * b], som: true};
+}
+// Om en om een raadsel en een som; raadsels die hij de laatste tijd al kreeg eerst overslaan.
+function nieuweVraag(){
+  if (Math.random() < 0.5) return rekensom();
+  const gehad = new Set([...recent, log].flatMap(r => r.hulpRaadsels || []));
+  const vers = RAADSELS.map((x, i) => ({...x, id: i})).filter(x => !gehad.has(x.id));
+  const pool = vers.length ? vers : RAADSELS.map((x, i) => ({...x, id: i}));
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+// Plekken waar nog geen goede letter op stond en die nog niet als hulp gegeven zijn.
+function openPlekken(woord, gokken){
+  const goed = new Set(), hulp = new Set(log.hulpPos || []);
+  for (const g of gokken) score(g, woord).forEach((x, i) => { if (x === "goed") goed.add(i); });
+  return [...woord].map((_, i) => i).filter(i => !goed.has(i) && !hulp.has(i));
+}
+let hulpVraag = null, hulpAntwoord = "";
+function hulpBlok(woord, gokken){
+  const el = document.createElement("div"); el.className = "hulp";
+  const gehad = log.hulpPos || [], open = openPlekken(woord, gokken);
+  if (gehad.length) el.insertAdjacentHTML("beforeend", `<p class="note">Hulpletters: ${[...gehad].sort((x, y) => x - y).map(i => `${i + 1}e letter = <b>${woord[i]}</b>`).join(", ")}</p>`);
+  if (!kanAfvinken()){ return el; }
+  const kan = !log.puzzel && gehad.length < MAXHULP && open.length > 1;
+  if (!hulpVraag || !kan){
+    if (!kan){ hulpVraag = null; return el; }
+    const b = document.createElement("button"); b.type = "button";
+    b.textContent = `🔤 Letter erbij (nog ${MAXHULP - gehad.length})`;
+    b.onclick = () => { hulpVraag = nieuweVraag(); hulpAntwoord = ""; renderToday(); };
+    el.appendChild(b);
+    return el;
+  }
+  el.insertAdjacentHTML("beforeend", `<p class="hulpvraag">${hulpVraag.som ? "🧮" : "🤔"} ${esc(hulpVraag.v)}</p>
+    <label>Jouw antwoord<input class="hulpin" ${hulpVraag.som ? 'inputmode="numeric" pattern="[0-9]*"' : 'autocapitalize="off"'} autocomplete="off"></label>
+    <div class="row"><button type="button" class="primary">Controleer</button><button type="button">Andere vraag</button><button type="button" class="link">Stoppen</button></div>`);
+  const inp = el.querySelector("input"), [ok, ander, stop] = el.querySelectorAll("button");
+  inp.value = hulpAntwoord; inp.oninput = () => hulpAntwoord = inp.value;
+  inp.onkeydown = e => { if (e.key === "Enter") ok.click(); };
+  ok.onclick = () => {
+    if (!inp.value.trim()){ inp.focus(); return; }
+    if (!hulpVraag.a.map(normAntw).includes(normAntw(inp.value))){ toast("Helaas, dat is het niet. Probeer nog eens!"); inp.select(); return; }
+    const plekken = openPlekken(woord, log.pogingen || []), pos = plekken[Math.floor(Math.random() * plekken.length)];
+    log = {...log, hulpPos: [...(log.hulpPos || []), pos], ...(hulpVraag.som ? {} : {hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]})};
+    hulpVraag = null; hulpAntwoord = ""; renderToday(); saveLog(log);
+    toast(`Goed zo! De ${pos + 1}e letter is een ${woord[pos]}`);
+  };
+  ander.onclick = () => { if (!hulpVraag.som) log = {...log, hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]}; hulpVraag = nieuweVraag(); hulpAntwoord = ""; renderToday(); };
+  stop.onclick = () => { hulpVraag = null; hulpAntwoord = ""; renderToday(); };
+  setTimeout(() => inp.focus());
+  return el;
+}
 function renderPuzzle(t){
   const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel, delen = woordVorm(day).split(" ");
   if (kanAfvinken() && !klaar) laadWoordenboek();
@@ -939,7 +1030,8 @@ function renderPuzzle(t){
   for (let r = 0; r < POGINGEN; r++){
     const g = gokken[r], s = g ? score(g, woord) : null;
     const tekst = g || (r === gokken.length && !klaar ? invoer : "");
-    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : ""}">${tekst[i] || ""}</div>${spatieNa.has(i) ? "<div></div>" : ""}`);
+    const hulpRij = !g && r === gokken.length && !klaar ? new Set(log.hulpPos || []) : new Set();
+    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : hulpRij.has(i) ? "hulpletter" : ""}">${tekst[i] || (hulpRij.has(i) ? woord[i] : "")}</div>${spatieNa.has(i) ? "<div></div>" : ""}`);
   }
   card.appendChild(grid);
   // De omschrijving is een hint: pas zichtbaar als hij erom vraagt (of als het woord klaar is).
@@ -951,6 +1043,7 @@ function renderPuzzle(t){
       card.appendChild(h);
     } else card.insertAdjacentHTML("beforeend", `<p class="note">Er is een hint, die heeft hij nog niet bekeken.</p>`);
   }
+  card.appendChild(hulpBlok(woord, gokken));
   if (klaar){
     const gewonnen = gokken.at(-1) === woord;
     card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woordVorm(day)}.`}</b> Morgen een nieuw woord.</p>`);
@@ -1216,7 +1309,7 @@ function renderPlan(){
   $("planPast").hidden = !geweest.length;
   $("planPastRows").innerHTML = geweest.map(d => {
     const pl = planVan(d), l = byDate[d] || {};
-    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${l.hint ? " (met hint)" : ""}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
+    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${[l.hint && "hint", l.hulpPos?.length && `${l.hulpPos.length} hulpletter${l.hulpPos.length > 1 ? "s" : ""}`].filter(Boolean).map(x => ` (met ${x})`).join("")}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
     const tekst = o => draad(d, o).map(r => `💬 ${esc(r.van)}: “${esc(r.tekst)}”`).join("<br>");
     const rw = tekst("woord"), rf = tekst("foto");
