@@ -221,6 +221,10 @@ input,select,textarea{font-size:max(16px,1em)!important}
       <p>Je kijkt naar <b id="pastName"></b>.<span id="pastHint"> Vergeten iets af te vinken? Dat kan hier nog.</span></p>
       <button class="primary" id="backToday">Terug naar vandaag</button>
     </div>
+    <div class="card" id="reactiesCard" hidden>
+      <h2>Nieuwe reacties</h2>
+      <div id="reactiesLijst"></div>
+    </div>
     <div class="card survived" id="survivedCard" hidden>
       <h2>Het zit erop!</h2>
       <p>Ben je wakker en weer een beetje bij? Tik dan hier.</p>
@@ -481,18 +485,21 @@ function goDay(d){
 async function loadAll(){
   day = viewDay || iso(new Date());
   // ponytail: 150 dagen terug dekt 2 weken voor de OK + 16 herstelweken; ruimer ophalen als het plan langer wordt.
-  const [s, w, f, l, p, dp] = await Promise.all([
+  const [s, w, f, l, p, dp, rc] = await Promise.all([
     sb.from("instellingen").select().eq("id", 1).maybeSingle(),
     sb.from("weken").select(),
     sb.from("filmpjes").select().order("gemaakt"),
     sb.from("log").select().gte("datum", addDays(day, -150)),
     canSetup ? sb.from("toegang").select().order("rol") : {data: []},
     sb.from("dagplan").select().gte("datum", addDays(day, -150)),
+    sb.from("reacties").select().gte("datum", addDays(day, -150)),
   ]);
   if (s.error || w.error || f.error || l.error || p.error){ toast("Laden lukte niet. Controleer je internet."); return; }
   // Een ontbrekend of nieuw onderdeel mag de rest niet blokkeren.
   if (dp.error) toast("Plannen laden lukte niet (" + dp.error.message + "). De rest werkt wel.");
   dagplan = {}; for (const r of dp.data || []) dagplan[r.datum] = r;
+  // Ontbreekt de tabel reacties nog, dan werkt de rest gewoon; alleen reageren lukt dan niet.
+  reacties = rc.data || [];
   settings = s.data || {};
   people = p.data;
   for (const sel of document.querySelectorAll(".uploader .van")){
@@ -701,6 +708,7 @@ function renderToday(){
   renderSurvived();
   renderAlbum();
   renderGezien();
+  renderNieuweReacties();
   renderHistory();
 }
 
@@ -762,34 +770,66 @@ const planVan = d => dagplan[d] || {};
 const opdrachtVanDaag = () => planVan(day).opdracht || "";
 let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
 let fotoFout = {}; // pad -> waarom er geen link kwam
-// Papa's reactie bij het woord of de foto van de dag (in zijn logboek, dus geen extra tabel of rechten nodig).
-let reactieOpen = null, reactieConcept = "";
-function reactieBlok(key){
+// Reacties bij het woord of de foto van de dag: papa en familie kunnen op elkaar reageren (tabel "reacties").
+// Oude reacties van papa uit zijn logboek (reactieWoord/reactieFoto) staan er als eerste bij.
+let reacties = [], reactieOpen = null, reactieConcept = "";
+const OUDE_REACTIE = {woord: "reactieWoord", foto: "reactieFoto"};
+const papaNaam = () => settings.naam || "Papa";
+function draad(datum, onderwerp){
+  const l = datum === day ? log : recent.find(r => r.datum === datum) || {}, oud = l[OUDE_REACTIE[onderwerp]];
+  return [...(oud ? [{id: "oud", van: papaNaam(), tekst: oud, oud: true}] : []),
+    ...reacties.filter(r => r.datum === datum && r.onderwerp === onderwerp).sort((a, b) => a.gemaakt < b.gemaakt ? -1 : 1)];
+}
+const vanMij = r => r.oud ? kanAfvinken() : r.email === me.email;
+function reactieBlok(onderwerp){
   const el = document.createElement("div"); el.className = "reactie";
-  const tekst = log[key] || "", naam = settings.naam || "Papa";
-  if (reactieOpen === key && kanAfvinken()){
-    el.innerHTML = `<label>Jouw reactie<textarea rows="2" maxlength="280" placeholder="Wat vond je ervan?"></textarea></label><div class="row"><button type="button" class="primary">Plaatsen</button><button type="button">Annuleren</button></div>`;
-    const ta = el.querySelector("textarea"), [ok, weg] = el.querySelectorAll("button");
-    ta.value = reactieConcept || tekst; ta.oninput = () => reactieConcept = ta.value;
+  const lijst = draad(day, onderwerp);
+  for (const r of lijst){
+    const p = document.createElement("p"); p.className = "reactietekst";
+    p.innerHTML = `💬 <b>${esc(vanMij(r) ? "Jij" : r.van)}:</b> “${esc(r.tekst)}”`;
+    if (vanMij(r) || canSetup){
+      const x = document.createElement("button"); x.type = "button"; x.className = "link"; x.textContent = "weghalen";
+      x.onclick = async () => {
+        if (!confirm("Deze reactie weghalen?")) return;
+        if (r.oud){ log = {...log, [OUDE_REACTIE[onderwerp]]: undefined}; renderToday(); await saveLog(log); return; }
+        const {error} = await sb.from("reacties").delete().eq("id", r.id);
+        if (error){ toast("Weghalen lukte niet: " + error.message); return; }
+        reacties = reacties.filter(x => x.id !== r.id); renderToday();
+      };
+      p.appendChild(x);
+    }
+    el.appendChild(p);
+  }
+  if (reactieOpen === onderwerp){
+    el.insertAdjacentHTML("beforeend", `<label>Jouw reactie<textarea rows="2" maxlength="280" placeholder="${lijst.length ? "Reageer terug…" : "Wat vond je ervan?"}"></textarea></label><div class="row"><button type="button" class="primary">Plaatsen</button><button type="button">Annuleren</button></div>`);
+    const ta = el.querySelector("textarea"), [ok, weg] = el.querySelectorAll(".row button");
+    ta.value = reactieConcept; ta.oninput = () => reactieConcept = ta.value;
     ok.onclick = async () => {
-      const nieuw = ta.value.trim(), vorig = log;
-      log = {...log, [key]: nieuw || undefined}; reactieOpen = null; reactieConcept = ""; renderToday();
-      if (!await saveLog(log)){ log = vorig; renderToday(); return; }
-      renderAlbum(); // album leest uit recent, dat saveLog net bijwerkte
-      toast(nieuw ? "Reactie geplaatst. De familie kan hem zien." : "Reactie weggehaald");
+      const tekst = ta.value.trim(); if (!tekst){ ta.focus(); return; }
+      ok.disabled = true;
+      const {data, error} = await sb.from("reacties").insert({datum: day, onderwerp, van: kanAfvinken() ? papaNaam() : (me.naam || "Familie"), tekst}).select().single();
+      ok.disabled = false;
+      if (error){ toast("Plaatsen lukte niet: " + error.message); return; }
+      reacties.push(data); reactieOpen = null; reactieConcept = ""; renderToday();
+      toast("Reactie geplaatst");
     };
     weg.onclick = () => { reactieOpen = null; reactieConcept = ""; renderToday(); };
     setTimeout(() => ta.focus());
     return el;
   }
-  if (tekst) el.innerHTML = `<p class="reactietekst">💬 ${esc(kanAfvinken() ? "Jij" : naam)}: “${esc(tekst)}”</p>`;
-  if (kanAfvinken()){
-    const b = document.createElement("button"); b.type = "button"; b.className = "link";
-    b.textContent = tekst ? "Reactie aanpassen" : "💬 Reactie plaatsen";
-    b.onclick = () => { reactieOpen = key; reactieConcept = ""; renderToday(); };
-    el.appendChild(b);
-  }
-  return el.childNodes.length ? el : document.createComment("");
+  const b = document.createElement("button"); b.type = "button"; b.className = "link";
+  b.textContent = lijst.length ? "💬 Reageren" : "💬 Reactie plaatsen";
+  b.onclick = () => { reactieOpen = onderwerp; reactieConcept = ""; renderToday(); };
+  el.appendChild(b);
+  return el;
+}
+// Bovenaan Vandaag: reacties van anderen uit de afgelopen 7 dagen, zodat een antwoord op een oudere foto niet gemist wordt.
+function renderNieuweReacties(){
+  const vanaf = addDays(iso(new Date()), -6);
+  const lijst = reacties.filter(r => r.datum >= vanaf && r.email !== me.email).sort((a, b) => a.gemaakt < b.gemaakt ? 1 : -1).slice(0, 8);
+  $("reactiesCard").hidden = !lijst.length;
+  $("reactiesLijst").innerHTML = lijst.map(r => `<button type="button" class="item msg gezien" data-d="${r.datum}"><span class="ico" aria-hidden="true">💬</span><span class="grow"><b>${esc(r.van)}: “${esc(r.tekst)}”</b><small>bij ${r.onderwerp === "foto" ? "de foto" : "het woord"} van ${new Date(r.datum + "T12:00").toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "short"})}</small></span></button>`).join("");
+  $("reactiesLijst").onclick = e => { const b = e.target.closest("button[data-d]"); if (b) goDay(b.dataset.d); };
 }
 function renderFotoOpdracht(t){
   const card = document.createElement("div");
@@ -798,7 +838,7 @@ function renderFotoOpdracht(t){
   card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Maak een foto van</p><p class="opdracht">${esc(opdracht)}</p>`;
   if (klaar && fotoUrls[log.foto]) card.insertAdjacentHTML("beforeend", `<img class="fotoklaar" src="${fotoUrls[log.foto]}" alt="${esc(opdracht)}">`);
   else if (klaar) card.insertAdjacentHTML("beforeend", `<p class="note">De foto is gemaakt, maar laden lukte niet (${esc(fotoFout[log.foto] || "onbekend")}).</p>`);
-  if (klaar) card.appendChild(reactieBlok("reactieFoto"));
+  if (klaar) card.appendChild(reactieBlok("foto"));
   if (!kanAfvinken()){ if (!klaar) card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
   const lab = document.createElement("label");
   lab.className = klaar ? "link" : "big";
@@ -822,7 +862,7 @@ function renderFotoOpdracht(t){
 function renderAlbum(){
   const fotos = recent.filter(r => r.foto && fotoUrls[r.foto]).sort((a, b) => a.datum < b.datum ? 1 : -1);
   $("albumCard").hidden = !fotos.length;
-  $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}${r.reactieFoto ? `<br>💬 “${esc(r.reactieFoto)}”` : ""}</small></button>`).join("");
+  $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}${(x => x ? `<br>💬 ${esc(x.van)}: “${esc(x.tekst)}”` : "")(draad(r.datum, "foto")[0])}</small></button>`).join("");
   $("album").onclick = e => { const b = e.target.closest("button[data-pad]"); if (b) showMedia(b.dataset.titel, {soort: "foto", url: fotoUrls[b.dataset.pad]}); };
 }
 
@@ -896,7 +936,7 @@ function renderPuzzle(t){
   if (klaar){
     const gewonnen = gokken.at(-1) === woord;
     card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woord}.`}</b> Morgen een nieuw woord.</p>`);
-    card.appendChild(reactieBlok("reactieWoord"));
+    card.appendChild(reactieBlok("woord"));
     return card;
   }
   // Toetsenbord met de beste kleur die elke letter al kreeg.
@@ -1135,7 +1175,8 @@ function renderPlan(){
     const pl = planVan(d), l = byDate[d] || {};
     const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${l.hint ? " (met hint)" : ""}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
-    const rw = l.reactieWoord ? `💬 woord: “${esc(l.reactieWoord)}”` : "", rf = l.reactieFoto ? `💬 foto: “${esc(l.reactieFoto)}”` : "";
+    const tekst = o => draad(d, o).map(r => `💬 ${esc(r.van)}: “${esc(r.tekst)}”`).join("<br>");
+    const rw = tekst("woord"), rf = tekst("foto");
     return `<div class="prow past"><div class="pdate">${dagLabel(d)}</div><div class="grow"><small>${[w, rw, o, rf].filter(Boolean).join("<br>")}</small></div></div>`;
   }).join("");
   if (!$("moodSetup").children.length) $("moodSetup").innerHTML = Object.entries(gevoel()).map(([n, g]) => `<div class="row mrow" data-n="${n}"><label>Smiley<input class="me" maxlength="4" value="${esc(g.e)}"></label><label>Naam<input class="ml" maxlength="20" value="${esc(g.l)}"></label><label>Wat hij dan leest<input class="mr" maxlength="120" value="${esc(g.r)}"></label></div>`).join("");
