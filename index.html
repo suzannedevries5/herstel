@@ -81,6 +81,9 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .days button:hover{color:var(--ink)}
 .hday{cursor:pointer}
 .clue{font-size:19px!important;color:var(--ink)!important;font-style:italic}
+.reactie{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.reactie .link{align-self:flex-start}
+.reactietekst{margin:0;color:var(--ink)!important;font-style:italic}
 .clue span{font-style:normal;color:var(--muted)}
 .vh{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 label.link{color:var(--brand);text-decoration:underline;cursor:pointer;align-self:flex-start}
@@ -759,6 +762,35 @@ const planVan = d => dagplan[d] || {};
 const opdrachtVanDaag = () => planVan(day).opdracht || "";
 let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
 let fotoFout = {}; // pad -> waarom er geen link kwam
+// Papa's reactie bij het woord of de foto van de dag (in zijn logboek, dus geen extra tabel of rechten nodig).
+let reactieOpen = null, reactieConcept = "";
+function reactieBlok(key){
+  const el = document.createElement("div"); el.className = "reactie";
+  const tekst = log[key] || "", naam = settings.naam || "Papa";
+  if (reactieOpen === key && kanAfvinken()){
+    el.innerHTML = `<label>Jouw reactie<textarea rows="2" maxlength="280" placeholder="Wat vond je ervan?"></textarea></label><div class="row"><button type="button" class="primary">Plaatsen</button><button type="button">Annuleren</button></div>`;
+    const ta = el.querySelector("textarea"), [ok, weg] = el.querySelectorAll("button");
+    ta.value = reactieConcept || tekst; ta.oninput = () => reactieConcept = ta.value;
+    ok.onclick = async () => {
+      const nieuw = ta.value.trim(), vorig = log;
+      log = {...log, [key]: nieuw || undefined}; reactieOpen = null; reactieConcept = ""; renderToday();
+      if (!await saveLog(log)){ log = vorig; renderToday(); return; }
+      renderAlbum(); // album leest uit recent, dat saveLog net bijwerkte
+      toast(nieuw ? "Reactie geplaatst. De familie kan hem zien." : "Reactie weggehaald");
+    };
+    weg.onclick = () => { reactieOpen = null; reactieConcept = ""; renderToday(); };
+    setTimeout(() => ta.focus());
+    return el;
+  }
+  if (tekst) el.innerHTML = `<p class="reactietekst">💬 ${esc(kanAfvinken() ? "Jij" : naam)}: “${esc(tekst)}”</p>`;
+  if (kanAfvinken()){
+    const b = document.createElement("button"); b.type = "button"; b.className = "link";
+    b.textContent = tekst ? "Reactie aanpassen" : "💬 Reactie plaatsen";
+    b.onclick = () => { reactieOpen = key; reactieConcept = ""; renderToday(); };
+    el.appendChild(b);
+  }
+  return el.childNodes.length ? el : document.createComment("");
+}
 function renderFotoOpdracht(t){
   const card = document.createElement("div");
   const klaar = !!log.foto, opdracht = log.opdracht || opdrachtVanDaag();
@@ -766,6 +798,7 @@ function renderFotoOpdracht(t){
   card.innerHTML = `<h3>${esc(t.naam)}</h3><p>Maak een foto van</p><p class="opdracht">${esc(opdracht)}</p>`;
   if (klaar && fotoUrls[log.foto]) card.insertAdjacentHTML("beforeend", `<img class="fotoklaar" src="${fotoUrls[log.foto]}" alt="${esc(opdracht)}">`);
   else if (klaar) card.insertAdjacentHTML("beforeend", `<p class="note">De foto is gemaakt, maar laden lukte niet (${esc(fotoFout[log.foto] || "onbekend")}).</p>`);
+  if (klaar) card.appendChild(reactieBlok("reactieFoto"));
   if (!kanAfvinken()){ if (!klaar) card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
   const lab = document.createElement("label");
   lab.className = klaar ? "link" : "big";
@@ -789,7 +822,7 @@ function renderFotoOpdracht(t){
 function renderAlbum(){
   const fotos = recent.filter(r => r.foto && fotoUrls[r.foto]).sort((a, b) => a.datum < b.datum ? 1 : -1);
   $("albumCard").hidden = !fotos.length;
-  $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}</small></button>`).join("");
+  $("album").innerHTML = fotos.map(r => `<button type="button" data-pad="${esc(r.foto)}" data-titel="${esc(r.opdracht || "")}"><img src="${fotoUrls[r.foto]}" alt="" loading="lazy"><small>${esc(r.opdracht || "")}<br>${new Date(r.datum+"T12:00").toLocaleDateString("nl-NL",{weekday:"short",day:"numeric",month:"short"})}${r.reactieFoto ? `<br>💬 “${esc(r.reactieFoto)}”` : ""}</small></button>`).join("");
   $("album").onclick = e => { const b = e.target.closest("button[data-pad]"); if (b) showMedia(b.dataset.titel, {soort: "foto", url: fotoUrls[b.dataset.pad]}); };
 }
 
@@ -863,6 +896,7 @@ function renderPuzzle(t){
   if (klaar){
     const gewonnen = gokken.at(-1) === woord;
     card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woord}.`}</b> Morgen een nieuw woord.</p>`);
+    card.appendChild(reactieBlok("reactieWoord"));
     return card;
   }
   // Toetsenbord met de beste kleur die elke letter al kreeg.
@@ -1101,7 +1135,8 @@ function renderPlan(){
     const pl = planVan(d), l = byDate[d] || {};
     const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${l.hint ? " (met hint)" : ""}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
-    return `<div class="prow past"><div class="pdate">${dagLabel(d)}</div><div class="grow"><small>${[w, o].filter(Boolean).join("<br>")}</small></div></div>`;
+    const rw = l.reactieWoord ? `💬 woord: “${esc(l.reactieWoord)}”` : "", rf = l.reactieFoto ? `💬 foto: “${esc(l.reactieFoto)}”` : "";
+    return `<div class="prow past"><div class="pdate">${dagLabel(d)}</div><div class="grow"><small>${[w, rw, o, rf].filter(Boolean).join("<br>")}</small></div></div>`;
   }).join("");
   if (!$("moodSetup").children.length) $("moodSetup").innerHTML = Object.entries(gevoel()).map(([n, g]) => `<div class="row mrow" data-n="${n}"><label>Smiley<input class="me" maxlength="4" value="${esc(g.e)}"></label><label>Naam<input class="ml" maxlength="20" value="${esc(g.l)}"></label><label>Wat hij dan leest<input class="mr" maxlength="120" value="${esc(g.r)}"></label></div>`).join("");
 }
