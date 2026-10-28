@@ -63,6 +63,7 @@ button.link.danger{color:var(--danger)}
 button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .wgrid{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,52px));gap:6px;justify-content:center}
 .wgrid.lang{gap:4px}
+.pwfout{grid-column:1/-1;color:var(--danger);font-size:14px}
 .prow input.onbekend{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
 .wgrid.lang .wtile{font-size:19px;border-radius:6px}
 .wgrid.heellang{gap:3px}
@@ -351,7 +352,7 @@ input,select,textarea{font-size:max(16px,1em)!important}
   <section id="viewPlan" class="view" hidden>
     <div class="card">
       <h2>Woord en foto per dag</h2>
-      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (minstens 3 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Het wordt vanzelf opgeslagen.</p>
+      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (minstens 3 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Alles wordt vanzelf opgeslagen zodra je een vakje verlaat (tik ernaast of op Gereed); je ziet dan "Opgeslagen ✓".</p>
       <div class="row"><button type="button" id="planFill">Vul lege dagen met suggesties</button><span class="note">voor de komende 3 weken</span></div>
       <div id="planRows"></div>
       <details class="group" id="planPast"><summary>Geweest</summary><div id="planPastRows"></div></details>
@@ -1190,9 +1191,14 @@ const dagLabel = d => { const x = new Date(d+"T12:00"); return `<b>${x.toLocaleD
 function renderPlan(){
   const vandaag = iso(new Date()), byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
   const komend = Array.from({length: 21}, (_, i) => addDays(vandaag, i));
-  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="40" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
+  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="40" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"><small class="pwfout" hidden></small></div>`; }).join("");
   // Woord niet in het woordenboek: rood randje, en bij opslaan eerst vragen.
-  const markeer = inp => { const fout = onbekend(vormVan(inp.value)); inp.classList.toggle("onbekend", !!fout.length); inp.title = fout.length ? `Niet in het woordenboek: ${fout.join(", ")}` : ""; return fout; };
+  const markeer = inp => {
+    const fout = onbekend(vormVan(inp.value)), m = inp.closest(".prow").querySelector(".pwfout");
+    inp.classList.toggle("onbekend", !!fout.length);
+    m.hidden = !fout.length; m.textContent = `⚠️ ${fout.join(", ")} staat niet in het woordenboek`;
+    return fout;
+  };
   laadWoordenboek().then(() => { for (const inp of $("planRows").querySelectorAll(".pw")) markeer(inp); });
   $("planRows").oninput = e => { if (e.target.matches(".pw")) markeer(e.target); };
   $("planRows").onchange = e => {
@@ -1225,6 +1231,7 @@ async function bewaarDag(datum, woord, omschrijving, opdracht){
   const {error} = await sb.from("dagplan").upsert(rij);
   if (error){ toast("Opslaan lukte niet: " + error.message); return; }
   dagplan[datum] = rij;
+  toast("Opgeslagen ✓");
 }
 $("planFill").onclick = async () => {
   const vandaag = iso(new Date()), rijen = [];
