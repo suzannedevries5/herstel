@@ -153,6 +153,14 @@ details.opties>summary{cursor:pointer;font-weight:700;font-size:16px}
 .big small{font:400 18px var(--font);color:var(--muted)}
 .waterbtns{display:flex;gap:10px;flex-wrap:wrap}
 .waterbtns .primary{font-size:20px;padding:12px 18px;background:var(--water);border-color:var(--water);color:#fff}
+#drinkReadout{min-height:1.5em;font-variant-numeric:tabular-nums}
+.chart .sip{fill:var(--water);stroke:var(--card);stroke-width:2}
+.chart .sip.sel{fill:var(--sun)}
+#drinkEdit summary{cursor:pointer;color:var(--brand);font-weight:700;font-size:16px}
+.drinklist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.drinkrow{display:flex;align-items:center;gap:10px}
+.drinkrow span{flex:0 0 100px;color:var(--muted);font-size:16px}
+.drinkrow input{width:auto;flex:0 1 140px}
 .chart{width:100%;height:auto;display:block;touch-action:manipulation}
 .chart text{fill:var(--muted);font:12px var(--font);font-variant-numeric:tabular-nums}
 .chart .hit{fill:transparent;cursor:pointer}
@@ -282,6 +290,14 @@ input,select,textarea{font-size:max(16px,1em)!important}
           </div>
         </div>
       </div>
+      <div id="drinkBox" hidden>
+        <p id="drinkReadout" aria-live="polite"></p>
+        <svg class="chart" id="drinkChart" viewBox="0 0 360 150" role="img" aria-label="Tijdlijn: wanneer gedronken"></svg>
+      </div>
+      <details id="drinkEdit" hidden>
+        <summary>Tijden aanpassen</summary>
+        <div class="drinklist" id="drinkList"></div>
+      </details>
     </div>
 
     <div class="list" id="tasks"></div>
@@ -673,6 +689,68 @@ function renderWater(){
   $("waterLeft").textContent = ml>=goal ? "Fles vol! Extra drinken mag altijd." : `Nog ${left} ${left===1?"glas":"glazen"} te gaan`;
   $("waterMin").disabled = ml<=0 || !kanAfvinken();
   $("waterPlus").disabled = !kanAfvinken();
+  renderDrinkChart();
+  renderDrinkEdit();
+}
+
+// Elk glas krijgt de tijd van het tikken (log.glazen = ["09:15", ...], gesorteerd). log.water blijft het totaal in ml.
+// Glazen van vóór deze functie, of op een eerdere dag bijgetikt, hebben geen tijd; die kun je alsnog invullen.
+const nuTijd = () => new Date().toTimeString().slice(0,5);
+const glazenVan = l => [...(l.glazen||[])].sort();
+const zonderTijd = l => Math.max(0, Math.round((l.water||0)/GLAS) - (l.glazen||[]).length);
+const minuten = t => +t.slice(0,2)*60 + +t.slice(3,5);
+
+// Tijdlijn: opgeteld gedronken door de dag heen, met een bolletje per glas. Tik op een bolletje voor de tijd.
+function renderDrinkChart(){
+  const tijden = glazenVan(log);
+  $("drinkBox").hidden = !tijden.length;
+  if (!tijden.length) return;
+  const goal = waterGoal(), los = zonderTijd(log), totaal = (los + tijden.length)*GLAS;
+  const eerste = minuten(tijden[0]), laatste = minuten(tijden.at(-1));
+  const van = Math.min(7*60, Math.floor(eerste/60)*60), tot = Math.max(22*60, Math.ceil((laatste+1)/60)*60);
+  const eind = isToday() ? Math.max(laatste, Math.min(tot, minuten(nuTijd()))) : tot;
+  const W=360, H=150, L=38, R=8, T=10, B=22, h=H-T-B, base=T+h;
+  const max = Math.max(goal, totaal);
+  const x = m => L + (m-van)/(tot-van)*(W-L-R), y = ml => base - ml/max*h;
+  let s = "";
+  for (const v of [0, goal]) s += `<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${v ? fmtL(v) : 0}</text>`;
+  s += `<line x1="${L}" x2="${W-R}" y1="${y(goal)}" y2="${y(goal)}" stroke="var(--sun)" stroke-width="2" stroke-dasharray="4 4"/>`;
+  for (let m = Math.ceil(van/180)*180; m <= tot; m += 180) s += `<text x="${x(m)}" y="${H-4}" text-anchor="middle">${String(m/60).padStart(2,"0")}:00</text>`;
+  // Trapjeslijn: vlak tot het volgende glas, dan 125 ml omhoog. Glazen zonder tijd tellen vanaf het begin mee.
+  let ml = los*GLAS, d = `M${x(van)},${y(ml)}`;
+  const punten = tijden.map(t => { d += `H${x(minuten(t))}`; ml += GLAS; d += `V${y(ml)}`; return {t, ml}; });
+  d += `H${x(eind)}`;
+  s += `<path d="${d}V${base}H${x(van)}z" fill="var(--water)" opacity=".15"/><path d="${d}" fill="none" stroke="var(--water)" stroke-width="3" stroke-linejoin="round"/>`;
+  punten.forEach((p,i) => { s += `<circle class="sip" data-i="${i}" cx="${x(minuten(p.t))}" cy="${y(p.ml)}" r="5"/>`; });
+  punten.forEach((p,i) => { s += `<circle class="hit" data-i="${i}" cx="${x(minuten(p.t))}" cy="${y(p.ml)}" r="14"/>`; });
+  const titel = `Laatste glas om ${tijden.at(-1)}` + (los ? ` · ${los} ${los===1?"glas":"glazen"} zonder tijd` : "");
+  const svg = $("drinkChart"); svg.innerHTML = s;
+  const select = i => { svg.querySelectorAll(".sip").forEach(el => el.classList.toggle("sel", el.dataset.i==i)); $("drinkReadout").textContent = i==null ? titel : `${punten[i].t} · glas ${los+i+1} · ${fmtL(punten[i].ml)} in totaal`; };
+  svg.querySelectorAll(".hit").forEach(c => { c.onpointerenter = c.onclick = () => select(+c.dataset.i); });
+  svg.onpointerleave = e => { if (e.pointerType === "mouse") select(null); };
+  select(null);
+}
+
+// Tijden achteraf aanpassen, een glas zonder tijd alsnog een tijd geven, of een glas weghalen.
+function renderDrinkEdit(){
+  const el = $("drinkList");
+  if (el.contains(document.activeElement)) return; // niet verbouwen terwijl hij een tijd kiest; bij blur alsnog
+  const tijden = glazenVan(log), los = zonderTijd(log);
+  $("drinkEdit").hidden = !kanAfvinken() || !(tijden.length + los);
+  const rijen = [...tijden, ...Array(los).fill("")];
+  el.innerHTML = rijen.map((t,i) => `<div class="drinkrow"><span>${t ? "Glas "+(i+1) : "Zonder tijd"}</span><input type="time" value="${t}" aria-label="Tijd ${t ? "glas "+(i+1) : "glas zonder tijd"}"><button class="link danger" aria-label="Glas weghalen">Weg</button></div>`).join("");
+  el.querySelectorAll(".drinkrow").forEach((row, i) => {
+    const inp = row.querySelector("input");
+    inp.onchange = () => {
+      const glazen = [...el.querySelectorAll("input")].map(x => x.value).filter(Boolean).sort();
+      save({glazen}, null);
+    };
+    inp.onblur = () => setTimeout(renderDrinkEdit, 0);
+    row.querySelector("button").onclick = () => {
+      const rest = rijen.filter((_,j) => j !== i);
+      save({water: Math.max(0, (log.water||0) - GLAS), glazen: rest.filter(Boolean).sort()}, null);
+    };
+  });
 }
 
 function renderToday(){
@@ -1105,10 +1183,17 @@ async function save(patch, reward){
 $("waterPlus").onclick = () => {
   const goal = waterGoal(), before = log.water||0, ml = before + GLAS;
   const vol = before < goal && ml >= goal;
-  save({water: ml}, vol ? {cat:"water", title:"Fles vol!", text:`${fmtL(goal)} gedronken. Goed bezig!`} : null);
+  // Vandaag: tijd van nu. Op een eerdere dag weet de app de tijd niet; die kan hij zelf invullen.
+  const glazen = isToday() ? [...glazenVan(log), nuTijd()].sort() : glazenVan(log);
+  save({water: ml, glazen}, vol ? {cat:"water", title:"Fles vol!", text:`${fmtL(goal)} gedronken. Goed bezig!`} : null);
   if (ml < goal){ const left = Math.ceil((goal-ml)/GLAS); toast(`Glas erbij! Nog ${left} te gaan`); }
 };
-$("waterMin").onclick = () => save({water: Math.max(0, (log.water||0) - GLAS)}, null);
+// Vandaag eerst het laatste glas met tijd eraf (een mistik), op een eerdere dag eerst een glas zonder tijd.
+$("waterMin").onclick = () => {
+  const glazen = glazenVan(log);
+  if (glazen.length && (isToday() || !zonderTijd(log))) glazen.pop();
+  save({water: Math.max(0, (log.water||0) - GLAS), glazen}, null);
+};
 
 // De iPhone-opdracht opent de app als ...#stappen1234. Tolerant voor "4,231" of "4231.0".
 async function syncSteps(){
