@@ -61,22 +61,22 @@ button.link.danger{color:var(--danger)}
 .moods button.on{border-color:var(--brand);background:var(--glass);font-weight:700}
 .survived{border:2px solid var(--sun);text-align:center;align-items:center}
 button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
-.wgrid{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,52px));gap:6px;justify-content:center}
-.wgrid.lang{gap:4px}
-.pwfout{grid-column:1/-1;color:var(--danger);font-size:14px}
-.prow input.onbekend{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
-.wgrid.lang .wtile{font-size:19px;border-radius:6px}
-.wgrid.heellang{gap:3px}
-.wgrid.heellang .wtile{font-size:15px;border-radius:4px;border-width:1px}
-.wtile{aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--line);border-radius:8px;font:800 26px var(--display);color:var(--ink)}
-.wtile.vol{border-color:var(--muted)}
-.wtile.hulpletter{color:var(--muted);border-style:dashed;border-color:var(--done)}
+.cgrid{display:flex;flex-wrap:wrap;gap:14px 16px;justify-content:center}
+.cword{display:flex;flex-wrap:wrap;gap:2px}
+.ccel{display:flex;flex-direction:column;align-items:center;gap:2px;width:27px;padding:0;border:0;background:none;color:var(--ink);font-weight:400}
+.ccel .cl{display:grid;place-items:center;width:100%;height:36px;border-bottom:3px solid var(--muted);border-radius:6px 6px 0 0;font:800 22px var(--display);color:var(--ink)}
+.ccel small{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ccel.teken{width:auto}
+.ccel.teken .cl{border:0}
+.ccel.vast .cl{color:var(--done);border-bottom-color:var(--done)}
+.ccel.sel .cl{background:var(--sun);color:#15262B;border-bottom-color:var(--brand)}
+.ccel.sel small{color:var(--ink);font-weight:700}
+.ccel.fout .cl{color:var(--danger);border-bottom-color:var(--danger)}
+.ccel:disabled{opacity:1;cursor:default}
 .hulp{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .hulp > button{align-self:flex-start}
 .hulpvraag{font:600 20px/1.35 var(--display)!important;color:var(--ink)!important;margin:0}
-.wtile.goed,.wkbd .goed{background:var(--done);border-color:var(--done);color:#fff}
-.wtile.bijna,.wkbd .bijna{background:var(--sun);border-color:var(--sun);color:#15262B}
-.wtile.mis,.wkbd .mis{background:var(--muted);border-color:var(--muted);color:var(--bg)}
+.wkbd .mis{background:var(--muted);border-color:var(--muted);color:var(--bg)}
 .wkbd{display:flex;flex-direction:column;gap:6px}
 .wkbd div{display:flex;gap:4px;justify-content:center}
 .wkbd button{flex:1 1 0;max-width:40px;padding:12px 0;font-size:17px;border-color:var(--line);color:var(--ink)}
@@ -371,8 +371,8 @@ input,select,textarea{font-size:max(16px,1em)!important}
 
   <section id="viewPlan" class="view" hidden>
     <div class="card">
-      <h2>Woord en foto per dag</h2>
-      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag het woord dat hij moet raden (minstens 3 letters, omschrijving mag erbij) en waar hij een foto van maakt. Een lege dag = die dag geen woord of foto. Alles wordt vanzelf opgeslagen zodra je een vakje verlaat (tik ernaast of op Gereed); je ziet dan "Opgeslagen ✓".</p>
+      <h2>Puzzel en foto per dag</h2>
+      <p>Wat je hier invult, staat die dag vanzelf bij papa. Per dag een zinnetje voor de codepuzzel (minstens 3 letters, hint mag erbij) en waar hij een foto van maakt. In de puzzel krijgt elke letter een nummer en raadt papa wat er staat. Een lege dag = die dag geen puzzel of foto. Alles wordt vanzelf opgeslagen zodra je een vakje verlaat (tik ernaast of op Gereed); je ziet dan "Opgeslagen ✓".</p>
       <div class="row"><button type="button" id="planFill">Vul lege dagen met suggesties</button><span class="note">voor de komende 3 weken</span></div>
       <div id="planRows"></div>
       <details class="group" id="planPast"><summary>Geweest</summary><div id="planPastRows"></div></details>
@@ -476,11 +476,11 @@ function waterGoal(){ return Math.round((+settings.water || 2) * 1000); }
 // Week 0 = voor de operatie, week 1 = dag 0–6 na de operatie, enz.
 function weekOf(date){ if (!settings.operatie) return 1; const n = diffDays(date, settings.operatie); return n < 0 ? 0 : Math.min(MAXWEEK, Math.floor(n/7)+1); }
 function planWeek(w){ for (let i=w; i>=0; i--) if (weken[i]) return i; return null; }
-// Woord van de dag en foto-opdracht komen vanzelf bij een dag zodra ze onder Plannen zijn ingevuld.
+// Codepuzzel en foto-opdracht komen vanzelf bij een dag zodra ze onder Plannen zijn ingevuld.
 function tasksFor(date){
   const w = planWeek(weekOf(date));
   const plan = w == null ? [] : weken[w].filter(t => !["puzzel", "foto"].includes(catOf(t)));
-  if (geldigWoord(date)) plan.push({id: "woord", naam: "Woord van de dag", keer: 1, soort: "puzzel"});
+  if (geldigCode(date)) plan.push({id: "woord", naam: "Codepuzzel van de dag", keer: 1, soort: "puzzel"});
   if (planVan(date).opdracht) plan.push({id: "fotodag", naam: "Foto van de dag", keer: 1, soort: "foto"});
   return plan;
 }
@@ -501,7 +501,7 @@ let viewDay = null;
 const isToday = () => day === iso(new Date());
 function goDay(d){
   viewDay = d === iso(new Date()) ? null : d;
-  day = d; log = recent.find(r => r.datum === d) || {}; invoer = "";
+  day = d; log = recent.find(r => r.datum === d) || {}; codeSel = null; codeFoutZien = false;
   renderHeader(); renderToday(); scrollTo({top: 0, behavior: "smooth"});
 }
 async function loadAll(){
@@ -854,7 +854,7 @@ const planVan = d => dagplan[d] || {};
 const opdrachtVanDaag = () => planVan(day).opdracht || "";
 let fotoUrls = {}; // pad -> tijdelijke link, gevuld in loadAll
 let fotoFout = {}; // pad -> waarom er geen link kwam
-// Reacties bij het woord of de foto van de dag: papa en familie kunnen op elkaar reageren (tabel "reacties").
+// Reacties bij de puzzel of de foto van de dag: papa en familie kunnen op elkaar reageren (tabel "reacties").
 // Oude reacties van papa uit zijn logboek (reactieWoord/reactieFoto) staan er als eerste bij.
 let reacties = [], reactieOpen = null, reactieConcept = "";
 const OUDE_REACTIE = {woord: "reactieWoord", foto: "reactieFoto"};
@@ -912,7 +912,7 @@ function renderNieuweReacties(){
   const vanaf = addDays(iso(new Date()), -6);
   const lijst = reacties.filter(r => r.datum >= vanaf && r.email !== me.email).sort((a, b) => a.gemaakt < b.gemaakt ? 1 : -1).slice(0, 8);
   $("reactiesCard").hidden = !lijst.length;
-  $("reactiesLijst").innerHTML = lijst.map(r => `<button type="button" class="item msg gezien" data-d="${r.datum}"><span class="ico" aria-hidden="true">💬</span><span class="grow"><b>${esc(r.van)}: “${esc(r.tekst)}”</b><small>bij ${r.onderwerp === "foto" ? "de foto" : "het woord"} van ${new Date(r.datum + "T12:00").toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "short"})}</small></span></button>`).join("");
+  $("reactiesLijst").innerHTML = lijst.map(r => `<button type="button" class="item msg gezien" data-d="${r.datum}"><span class="ico" aria-hidden="true">💬</span><span class="grow"><b>${esc(r.van)}: “${esc(r.tekst)}”</b><small>bij ${r.onderwerp === "foto" ? "de foto" : "de puzzel"} van ${new Date(r.datum + "T12:00").toLocaleDateString("nl-NL", {weekday: "long", day: "numeric", month: "short"})}</small></span></button>`).join("");
   $("reactiesLijst").onclick = e => { const b = e.target.closest("button[data-d]"); if (b) goDay(b.dataset.d); };
 }
 function renderFotoOpdracht(t){
@@ -985,37 +985,39 @@ function renderGezien(){
   };
 }
 
-/* ---------- Dagpuzzel: woord van de dag (zoals Wordle) ---------- */
-const WOORDEN_SUG = "TAART\nZOMER\nVOGEL\nMOLEN\nPIANO\nFIETS\nBLOEM\nAPPEL\nKAARS\nHAVEN\nZWAAN\nBROOD\nPAARD\nSCHIP";
-const POGINGEN = 6;
-const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-const woordOp = d => norm(planVan(d).woord || "").replace(/[^A-Z]/g, "");
-// Het woord met spaties, zoals "GOED ZO": de spaties staan bij papa al vast in het rooster.
-const vormVan = tekst => norm(tekst || "").replace(/[^A-Z ]/g, "").trim().split(/ +/).filter(Boolean);
-const woordVorm = d => vormVan(planVan(d).woord).join(" ");
-// Nederlands woordenboek (OpenTaal, zie woorden-LICENSE.txt): pas geladen als het nodig is.
-// null = nog aan het laden, false = laden mislukt (dan wordt niets geweigerd).
-let woordenboek = null, wbLaden = null;
-function laadWoordenboek(){
-  return wbLaden ||= fetch("woorden.txt").then(r => r.ok ? r.text() : Promise.reject(r.status))
-    .then(t => { woordenboek = new Set(t.split("\n")); }).catch(() => { woordenboek = false; });
+/* ---------- Dagpuzzel: codepuzzel (elke letter heeft een vast nummer) ---------- */
+const ZINNEN_SUG = "Elke dag een beetje beter\nNa regen komt zonneschijn\nOost west thuis best\nRome is niet in een dag gebouwd\nBeter laat dan nooit\nAlle begin is moeilijk\nDe aanhouder wint\nLachen is gezond\nGeduld is een schone zaak\nStap voor stap kom je er wel\nKomt tijd komt raad\nWe zijn trots op je\nWie niet waagt die niet wint\nZachte heelmeesters maken stinkende wonden";
+const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+// De tekst in stukjes: per woord een lijst tekens; een letter = {l: "A"}, de rest (punt, komma, cijfer) = {t: "."}.
+function codeDelen(tekst){
+  return (tekst || "").trim().split(/\s+/).filter(Boolean).map(w => [...w].map(c => {
+    const n = norm(c).replace(/[^A-Z]/g, "");
+    return n.length === 1 ? {l: n} : {t: c};
+  }));
 }
-// Welke losse woorden niet in het woordenboek staan (leeg als het woordenboek er niet is).
-const onbekend = delen => woordenboek ? delen.filter(w => !woordenboek.has(w)) : [];
-const geldigWoord = d => woordOp(d).length >= 3;
-const woordVanDaag = () => woordOp(day);
+const codeTekst = d => planVan(d).woord || "";
+const codeLetters = d => codeDelen(codeTekst(d)).flat().filter(x => x.l).map(x => x.l).join("");
+const geldigCode = d => codeLetters(d).length >= 3;
 const clueVanDaag = () => planVan(day).omschrijving || "";
-// Per letter: "goed" (juiste plek), "bijna" (zit erin, andere plek) of "mis". Dubbele letters tellen niet dubbel.
-function score(gok, woord){
-  const n = woord.length, uit = Array(n).fill("mis"), over = {};
-  for (let i = 0; i < n; i++){ if (gok[i] === woord[i]) uit[i] = "goed"; else over[woord[i]] = (over[woord[i]] || 0) + 1; }
-  for (let i = 0; i < n; i++) if (uit[i] !== "goed" && over[gok[i]] > 0){ uit[i] = "bijna"; over[gok[i]]--; }
-  return uit;
+// Vaste toevalsgetallen per dag en tekst: de nummers blijven gelijk, ook na herladen en bij de familie.
+function kansen(zaad){
+  let h = 1779033703;
+  for (const c of zaad) h = Math.imul(h ^ c.charCodeAt(0), 3432918353), h = h << 13 | h >>> 19;
+  return () => { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); return ((h ^= h >>> 16) >>> 0) / 4294967296; };
 }
-const RANG = {mis: 1, bijna: 2, goed: 3};
-let invoer = "";
-// Letter erbij: na een goed opgelost raadsel of een goede rekensom één letter op een plek die nog niet goed geraden is.
-// Maximaal 3 per dag, en er blijft altijd minstens één plek over om zelf te raden.
+// Letter -> nummer (1 t/m 26), plus een paar letters die er al gratis staan.
+function codeSleutel(d){
+  const rnd = kansen(d + "|" + norm(codeTekst(d)));
+  const nrs = Array.from({length: 26}, (_, i) => i + 1);
+  for (let i = 25; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [nrs[i], nrs[j]] = [nrs[j], nrs[i]]; }
+  const nr = Object.fromEntries([..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map((L, i) => [L, nrs[i]]));
+  const uniek = [...new Set(codeLetters(d))];
+  for (let i = uniek.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [uniek[i], uniek[j]] = [uniek[j], uniek[i]]; }
+  return {nr, gratis: uniek.slice(0, Math.floor(uniek.length / 5)), uniek};
+}
+let codeSel = null, codeFoutZien = false;
+// Letter erbij: na een goed opgelost raadsel of een goede rekensom één letter die nog niet goed staat.
+// Maximaal 3 per dag, en er blijft altijd minstens één letter over om zelf te raden.
 const MAXHULP = 3;
 const RAADSELS = [
   {v: "Wat heeft tanden, maar kan niet bijten?", a: ["kam", "zaag", "rits", "hark"]},
@@ -1061,18 +1063,23 @@ function nieuweVraag(){
   const pool = vers.length ? vers : RAADSELS.map((x, i) => ({...x, id: i}));
   return pool[Math.floor(Math.random() * pool.length)];
 }
-// Plekken waar nog geen goede letter op stond en die nog niet als hulp gegeven zijn.
-function openPlekken(woord, gokken){
-  const goed = new Set(), hulp = new Set(log.hulpPos || []);
-  for (const g of gokken) score(g, woord).forEach((x, i) => { if (x === "goed") goed.add(i); });
-  return [...woord].map((_, i) => i).filter(i => !goed.has(i) && !hulp.has(i));
+// Wat er bij een nummer staat: gratis of hulpletter = vast, anders wat papa invulde.
+function codeStand(s){
+  const vast = new Set([...s.gratis, ...(log.codeHulp || [])]), gok = log.code || {};
+  const letterBij = L => vast.has(L) ? L : gok[s.nr[L]] || "";
+  return {vast, gok, letterBij};
+}
+// Letters die nog niet vast staan en nog niet goed ingevuld zijn.
+function openLetters(s){
+  const {vast, gok} = codeStand(s);
+  return s.uniek.filter(L => !vast.has(L) && gok[s.nr[L]] !== L);
 }
 let hulpVraag = null, hulpAntwoord = "";
-function hulpBlok(woord, gokken){
+function hulpBlok(s){
   const el = document.createElement("div"); el.className = "hulp";
-  const gehad = log.hulpPos || [], open = openPlekken(woord, gokken);
-  if (gehad.length) el.insertAdjacentHTML("beforeend", `<p class="note">Hulpletters: ${[...gehad].sort((x, y) => x - y).map(i => `${i + 1}e letter = <b>${woord[i]}</b>`).join(", ")}</p>`);
-  if (!kanAfvinken()){ return el; }
+  const gehad = log.codeHulp || [], open = openLetters(s);
+  if (gehad.length) el.insertAdjacentHTML("beforeend", `<p class="note">Hulpletters: ${gehad.map(L => `<b>${L}</b> = ${s.nr[L]}`).join(", ")}</p>`);
+  if (!kanAfvinken()) return el;
   const kan = !log.puzzel && gehad.length < MAXHULP && open.length > 1;
   if (!hulpVraag || !kan){
     if (!kan){ hulpVraag = null; return el; }
@@ -1091,10 +1098,12 @@ function hulpBlok(woord, gokken){
   ok.onclick = () => {
     if (!inp.value.trim()){ inp.focus(); return; }
     if (!hulpVraag.a.map(normAntw).includes(normAntw(inp.value))){ toast("Helaas, dat is het niet. Probeer nog eens!"); inp.select(); return; }
-    const plekken = openPlekken(woord, log.pogingen || []), pos = plekken[Math.floor(Math.random() * plekken.length)];
-    log = {...log, hulpPos: [...(log.hulpPos || []), pos], ...(hulpVraag.som ? {} : {hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]})};
+    const kies = openLetters(s), L = kies[Math.floor(Math.random() * kies.length)];
+    // Stond die letter al bij een ander nummer ingevuld, dan haalt de hulpletter hem daar weg.
+    const code = Object.fromEntries(Object.entries(log.code || {}).filter(([n, g]) => g !== L && +n !== s.nr[L]));
+    log = {...log, code, codeHulp: [...gehad, L], ...(hulpVraag.som ? {} : {hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]})};
     hulpVraag = null; hulpAntwoord = ""; renderToday(); saveLog(log);
-    toast(`Goed zo! De ${pos + 1}e letter is een ${woord[pos]}`);
+    toast(`Goed zo! Nummer ${s.nr[L]} is de ${L}`);
   };
   ander.onclick = () => { if (!hulpVraag.som) log = {...log, hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]}; hulpVraag = nieuweVraag(); hulpAntwoord = ""; renderToday(); };
   stop.onclick = () => { hulpVraag = null; hulpAntwoord = ""; renderToday(); };
@@ -1102,25 +1111,25 @@ function hulpBlok(woord, gokken){
   return el;
 }
 function renderPuzzle(t){
-  const woord = woordVanDaag(), gokken = log.pogingen || [], klaar = !!log.puzzel, delen = woordVorm(day).split(" ");
-  if (kanAfvinken() && !klaar) laadWoordenboek();
-  // Na deze letterposities komt een spatie.
-  const spatieNa = new Set(delen.slice(0, -1).map((_, i) => delen.slice(0, i + 1).join("").length - 1));
+  const s = codeSleutel(day), delen = codeDelen(codeTekst(day)), klaar = !!log.puzzel;
+  // Oude dagen met het woordspel: opgelost als de laatste poging het woord was.
+  const opgelost = log.codeOpgelost ?? (log.pogingen ? log.pogingen.at(-1) === codeLetters(day) : false);
+  const {vast, letterBij} = codeStand(s), speel = kanAfvinken() && !klaar;
+  if (speel && (codeSel == null || vast.has(Object.keys(s.nr).find(L => s.nr[L] === codeSel)))) codeSel = volgendNummer(s, null);
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
-  const clue = clueVanDaag();
-  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Raad ${delen.length > 1 ? `de ${delen.length} woorden` : "het woord"} van ${woord.length} letters. Groen = goede letter op de goede plek, geel = zit erin maar op een andere plek.`}</p>`;
-  const grid = document.createElement("div"); grid.className = "wgrid" + (woord.length > 12 ? " heellang" : woord.length > 7 ? " lang" : "");
-  grid.style.setProperty("--n", woord.length);
-  if (spatieNa.size) grid.style.gridTemplateColumns = [...woord].map((_, i) => "minmax(0,52px)" + (spatieNa.has(i) ? " 10px" : "")).join(" ");
-  for (let r = 0; r < POGINGEN; r++){
-    const g = gokken[r], s = g ? score(g, woord) : null;
-    const tekst = g || (r === gokken.length && !klaar ? invoer : "");
-    const hulpRij = !g && r === gokken.length && !klaar ? new Set(log.hulpPos || []) : new Set();
-    for (let i = 0; i < woord.length; i++) grid.insertAdjacentHTML("beforeend", `<div class="wtile ${s ? s[i] : tekst[i] ? "vol" : hulpRij.has(i) ? "hulpletter" : ""}">${tekst[i] || (hulpRij.has(i) ? woord[i] : "")}</div>${spatieNa.has(i) ? "<div></div>" : ""}`);
-  }
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : "Elke letter heeft een eigen nummer. Hetzelfde nummer is overal dezelfde letter. Tik op een vakje en kies een letter. Kun jij lezen wat er staat?"}</p>`;
+  const grid = document.createElement("div"); grid.className = "cgrid";
+  grid.innerHTML = delen.map(w => `<div class="cword">${w.map(x => {
+    if (!x.l) return `<span class="ccel teken"><span class="cl">${esc(x.t)}</span><small></small></span>`;
+    const n = s.nr[x.l], toon = klaar ? x.l : letterBij(x.l);
+    const kl = [vast.has(x.l) ? "vast" : "", speel && n === codeSel ? "sel" : "", !klaar && codeFoutZien && toon && toon !== x.l ? "fout" : ""].filter(Boolean).join(" ");
+    return `<button type="button" class="ccel ${kl}" data-n="${n}" ${speel && !vast.has(x.l) ? "" : "disabled"} aria-label="Nummer ${n}${toon ? ", " + toon : ""}"><span class="cl">${toon}</span><small>${n}</small></button>`;
+  }).join("")}</div>`).join("");
+  grid.onclick = e => { const b = e.target.closest("button[data-n]"); if (b && !b.disabled){ codeSel = +b.dataset.n; renderToday(); } };
   card.appendChild(grid);
-  // De omschrijving is een hint: pas zichtbaar als hij erom vraagt (of als het woord klaar is).
+  // De omschrijving is een hint: pas zichtbaar als hij erom vraagt (of als de puzzel klaar is).
+  const clue = clueVanDaag();
   if (clue){
     if (log.hint || klaar) card.insertAdjacentHTML("beforeend", `<p class="clue">Hint: ${esc(clue)}</p>`);
     else if (kanAfvinken()){
@@ -1129,46 +1138,65 @@ function renderPuzzle(t){
       card.appendChild(h);
     } else card.insertAdjacentHTML("beforeend", `<p class="note">Er is een hint, die heeft hij nog niet bekeken.</p>`);
   }
-  card.appendChild(hulpBlok(woord, gokken));
+  card.appendChild(hulpBlok(s));
   if (klaar){
-    const gewonnen = gokken.at(-1) === woord;
-    card.insertAdjacentHTML("beforeend", `<p><b>${gewonnen ? `Geraden in ${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"}!` : `Het woord was ${woordVorm(day)}.`}</b> Morgen een nieuw woord.</p>`);
+    card.insertAdjacentHTML("beforeend", `<p><b>${opgelost ? "Opgelost!" : "Er stond:"}</b> ${opgelost ? "" : esc(codeTekst(day)) + ". "}Morgen een nieuwe puzzel.</p>`);
     card.appendChild(reactieBlok("woord"));
     return card;
   }
-  // Toetsenbord met de beste kleur die elke letter al kreeg.
-  const best = {};
-  for (const g of gokken) score(g, woord).forEach((s, i) => { if ((RANG[s] || 0) > (RANG[best[g[i]]] || 0)) best[g[i]] = s; });
-  if (!kanAfvinken()){ card.insertAdjacentHTML("beforeend", `<p>${gokken.length ? `${gokken.length} ${gokken.length === 1 ? "poging" : "pogingen"} tot nu toe.` : "Nog niet gespeeld vandaag."}</p>`); return card; }
+  const ingevuld = s.uniek.filter(L => letterBij(L)).length;
+  if (!kanAfvinken()){ card.insertAdjacentHTML("beforeend", `<p>${Object.keys(log.code || {}).length ? `${ingevuld} van de ${s.uniek.length} letters ingevuld.` : "Nog niet gespeeld vandaag."}</p>`); return card; }
+  // Alles ingevuld maar nog niet goed: laten weten, en op verzoek de foute letters rood maken.
+  if (ingevuld === s.uniek.length){
+    const fout = s.uniek.filter(L => letterBij(L) !== L).length;
+    card.insertAdjacentHTML("beforeend", `<p class="note">Alles is ingevuld, maar nog niet alles klopt.</p>`);
+    if (!codeFoutZien){
+      const b = document.createElement("button"); b.type = "button"; b.textContent = `Laat zien wat fout is (${fout})`;
+      b.onclick = () => { codeFoutZien = true; renderToday(); };
+      card.appendChild(b);
+    }
+  }
+  // Toetsenbord: letters die al ergens staan zijn grijs.
+  const gebruikt = new Set(s.uniek.map(letterBij).filter(Boolean));
   const kbd = document.createElement("div"); kbd.className = "wkbd";
   for (const rij of ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]){
     const r = document.createElement("div");
-    if (rij === "ZXCVBNM") r.insertAdjacentHTML("beforeend", `<button class="wide" data-k="OK">Raad</button>`);
-    for (const L of rij) r.insertAdjacentHTML("beforeend", `<button class="${best[L] || ""}" data-k="${L}">${L}</button>`);
+    for (const L of rij) r.insertAdjacentHTML("beforeend", `<button class="${gebruikt.has(L) ? "mis" : ""}" data-k="${L}">${L}</button>`);
     if (rij === "ZXCVBNM") r.insertAdjacentHTML("beforeend", `<button class="wide" data-k="DEL" aria-label="Letter weg">⌫</button>`);
     kbd.appendChild(r);
   }
   kbd.onclick = e => { const k = e.target.closest("button")?.dataset.k; if (k) toets(t, k); };
   card.appendChild(kbd);
+  const geefOp = document.createElement("button"); geefOp.type = "button"; geefOp.className = "link"; geefOp.textContent = "Ik geef het op";
+  geefOp.onclick = () => { if (confirm("Wil je zien wat er staat? Dan is de puzzel voor vandaag klaar.")) save({puzzel: true, codeOpgelost: false, [t.id]: 1}, {cat: "puzzel", title: "Bijna!", text: `Er stond: ${codeTekst(day)}`}); };
+  card.appendChild(geefOp);
   return card;
 }
+// Het volgende nummer (in leesvolgorde) dat nog leeg is; anders het volgende open nummer.
+function volgendNummer(s, na){
+  const {vast, gok} = codeStand(s);
+  const volgorde = [...new Set(codeLetters(day))].filter(L => !vast.has(L)).map(L => s.nr[L]);
+  if (!volgorde.length) return null;
+  const start = na == null ? -1 : volgorde.indexOf(na), rond = [...volgorde.slice(start + 1), ...volgorde.slice(0, start + 1)];
+  return rond.find(n => !gok[n]) ?? (na ?? volgorde[0]);
+}
 function toets(t, k){
-  if (k === "DEL"){ invoer = invoer.slice(0, -1); renderToday(); return; }
-  const woord = woordVanDaag();
-  if (k !== "OK"){ if (invoer.length < woord.length){ invoer += k; renderToday(); } return; }
-  if (invoer.length < woord.length){ toast(`Typ eerst ${woord.length} letters`); return; }
-  // Alleen bestaande Nederlandse woorden (per los woord); het goede antwoord telt altijd.
-  if (invoer !== woord){
-    if (woordenboek === null){ laadWoordenboek(); toast("Woordenboek wordt nog geladen, probeer het zo nog eens"); return; }
-    let i = 0;
-    const fout = onbekend(woordVorm(day).split(" ").map(d => invoer.slice(i, i += d.length)));
-    if (fout.length){ toast(`${fout.join(" ")} staat niet in het woordenboek`); return; }
+  const s = codeSleutel(day);
+  if (codeSel == null) return;
+  const code = {...(log.code || {})};
+  if (k === "DEL") delete code[codeSel];
+  else {
+    if (codeStand(s).vast.has(k)){ toast(`De ${k} staat al vast bij nummer ${s.nr[k]}`); return; }
+    // Een letter hoort maar bij één nummer: stond hij ergens anders, dan gaat hij daar weg.
+    for (const n in code) if (code[n] === k) delete code[n];
+    code[codeSel] = k;
   }
-  const pogingen = [...(log.pogingen || []), invoer];
-  invoer = "";
-  const gewonnen = pogingen.at(-1) === woord, op = pogingen.length >= POGINGEN;
-  if (gewonnen || op) save({pogingen, puzzel: true, [t.id]: 1}, {cat: "puzzel", title: gewonnen ? "Geraden!" : "Bijna!", text: gewonnen ? "" : `Het woord was ${woordVorm(day)}. Morgen een nieuw woord.`});
-  else { log = {...log, pogingen}; renderToday(); saveLog(log); }
+  codeFoutZien = false;
+  log = {...log, code};
+  const {letterBij} = codeStand(s);
+  if (s.uniek.every(L => letterBij(L) === L)){ save({code, puzzel: true, codeOpgelost: true, [t.id]: 1}, {cat: "puzzel", title: "Opgelost!", text: codeTekst(day)}); return; }
+  if (k !== "DEL") codeSel = volgendNummer(s, codeSel);
+  renderToday(); saveLog(log);
 }
 
 // reward = {cat, title?, text?} of null. De beloning start meteen, nog binnen de tik:
@@ -1371,30 +1399,15 @@ function msgRow(v, gezien){
   });
   return r;
 }
-/* ---------- Plannen: woord en foto-opdracht per dag ---------- */
-const WS = WOORDEN_SUG.split("\n"), OS = OPDRACHTEN_SUG.split("\n");
+/* ---------- Plannen: codepuzzel en foto-opdracht per dag ---------- */
+const WS = ZINNEN_SUG.split("\n"), OS = OPDRACHTEN_SUG.split("\n");
 const dagLabel = d => { const x = new Date(d+"T12:00"); return `<b>${x.toLocaleDateString("nl-NL",{weekday:"short"})}</b><small>${x.toLocaleDateString("nl-NL",{day:"numeric",month:"short"})}</small>`; };
 function renderPlan(){
   const vandaag = iso(new Date()), byDate = Object.fromEntries(recent.map(r => [r.datum, r]));
   const komend = Array.from({length: 21}, (_, i) => addDays(vandaag, i));
-  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="40" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Woord"><input class="pc" maxlength="80" placeholder="omschrijving (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"><small class="pwfout" hidden></small></div>`; }).join("");
-  // Woord niet in het woordenboek: rood randje, en bij opslaan eerst vragen.
-  const markeer = inp => {
-    const fout = onbekend(vormVan(inp.value)), m = inp.closest(".prow").querySelector(".pwfout");
-    inp.classList.toggle("onbekend", !!fout.length);
-    m.hidden = !fout.length; m.textContent = `⚠️ ${fout.join(", ")} staat niet in het woordenboek`;
-    return fout;
-  };
-  laadWoordenboek().then(() => { for (const inp of $("planRows").querySelectorAll(".pw")) markeer(inp); });
-  $("planRows").oninput = e => { if (e.target.matches(".pw")) markeer(e.target); };
+  $("planRows").innerHTML = komend.map((d, i) => { const pl = planVan(d); return `<div class="prow" data-d="${d}"><div class="pdate">${dagLabel(d)}${d === vandaag ? '<small class="nu">vandaag</small>' : ""}</div><input class="pw" maxlength="120" placeholder="${WS[i % WS.length]}" value="${esc(pl.woord || "")}" aria-label="Tekst voor de codepuzzel"><input class="pc" maxlength="80" placeholder="hint (mag)" value="${esc(pl.omschrijving || "")}" aria-label="Omschrijving"><input class="po" maxlength="80" placeholder="foto van: ${OS[i % OS.length]}" value="${esc(pl.opdracht || "")}" aria-label="Foto-opdracht"></div>`; }).join("");
   $("planRows").onchange = e => {
     const r = e.target.closest(".prow"); if (!r) return;
-    if (e.target.matches(".pw")){
-      const fout = markeer(e.target);
-      if (fout.length && !confirm(`"${fout.join(", ")}" staat niet in het Nederlandse woordenboek. Papa kan dan alleen dat woord zelf als poging gebruiken, andere niet-bestaande woorden worden geweigerd.\n\nToch gebruiken?`)){
-        e.target.value = planVan(r.dataset.d).woord || ""; markeer(e.target); return;
-      }
-    }
     bewaarDag(r.dataset.d, r.querySelector(".pw").value, r.querySelector(".pc").value, r.querySelector(".po").value);
   };
   // Geweest: wat er gepland was en hoe het ging, nieuwste bovenaan.
@@ -1402,7 +1415,9 @@ function renderPlan(){
   $("planPast").hidden = !geweest.length;
   $("planPastRows").innerHTML = geweest.map(d => {
     const pl = planVan(d), l = byDate[d] || {};
-    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (l.pogingen?.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${[l.hint && "hint", l.hulpPos?.length && `${l.hulpPos.length} hulpletter${l.hulpPos.length > 1 ? "s" : ""}`].filter(Boolean).map(x => ` (met ${x})`).join("")}` : "✗ niet geraden") : "– niet gespeeld"}` : "";
+    const extra = [l.hint && "hint", (l.codeHulp || l.hulpPos)?.length && `${(l.codeHulp || l.hulpPos).length} hulpletter${(l.codeHulp || l.hulpPos).length > 1 ? "s" : ""}`].filter(Boolean).map(x => ` (met ${x})`).join("");
+    const gelukt = l.codeOpgelost ?? (l.pogingen ? l.pogingen.at(-1) === codeLetters(d) : false);
+    const w = pl.woord ? `${esc(pl.woord)} ${l.puzzel ? (gelukt ? `✓ ${l.pogingen ? `geraden in ${l.pogingen.length}` : "opgelost"}${extra}` : l.pogingen ? "✗ niet geraden" : "✗ opgegeven") : l.code && Object.keys(l.code).length ? "– niet af" : "– niet gespeeld"}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
     const tekst = o => draad(d, o).map(r => `💬 ${esc(r.van)}: “${esc(r.tekst)}”`).join("<br>");
     const rw = tekst("woord"), rf = tekst("foto");
@@ -1412,7 +1427,7 @@ function renderPlan(){
 }
 async function bewaarDag(datum, woord, omschrijving, opdracht){
   const w = woord.trim(), n = norm(w).replace(/[^A-Z]/g, "").length;
-  if (w && n < 3){ toast("Een woord heeft minstens 3 letters"); return; }
+  if (w && n < 3){ toast("De puzzel heeft minstens 3 letters nodig"); return; }
   const rij = {datum, woord: w || null, omschrijving: omschrijving.trim() || null, opdracht: opdracht.trim() || null};
   const {error} = await sb.from("dagplan").upsert(rij);
   if (error){ toast("Opslaan lukte niet: " + error.message); return; }
