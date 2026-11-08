@@ -924,22 +924,30 @@ function renderFotoOpdracht(t){
   else if (klaar) card.insertAdjacentHTML("beforeend", `<p class="note">De foto is gemaakt, maar laden lukte niet (${esc(fotoFout[log.foto] || "onbekend")}).</p>`);
   if (klaar) card.appendChild(reactieBlok("foto"));
   if (!kanAfvinken()){ if (!klaar) card.insertAdjacentHTML("beforeend", `<p>Nog geen foto vandaag.</p>`); return card; }
-  const lab = document.createElement("label");
-  lab.className = klaar ? "link" : "big";
-  lab.innerHTML = `${klaar ? "Andere foto maken" : "Maak de foto"}<input type="file" accept="image/*" capture="environment" class="vh">`;
-  if (!klaar) lab.style.cssText = "font-size:22px;padding:16px 22px;width:100%";
-  const inp = lab.querySelector("input"), msg = document.createElement("p"); msg.className = "note";
-  inp.onchange = async () => {
-    const f = inp.files[0]; if (!f) return;
-    msg.textContent = "Foto versturen…";
-    const blob = await verkleinFoto(f), pad = `papa/${day}-${crypto.randomUUID().slice(0,8)}.jpg`;
-    const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: blob.type || "image/jpeg"});
-    if (up.error){ msg.textContent = `Versturen lukte niet (${up.error.message}).`; return; }
-    fotoUrls[pad] = URL.createObjectURL(blob);
-    const eerste = !log.foto;
-    save({foto: pad, opdracht, [t.id]: 1}, eerste ? {cat: "puzzel", title: "Mooie foto!", text: "De familie kan hem nu zien."} : null);
+  // Twee knoppen: meteen een foto maken met de camera, of een foto kiezen uit het fotoalbum van de telefoon.
+  const msg = document.createElement("p"); msg.className = "note";
+  const knop = (tekst, camera) => {
+    const lab = document.createElement("label");
+    lab.className = klaar ? "link" : "big";
+    lab.innerHTML = `${tekst}<input type="file" accept="image/*"${camera ? ' capture="environment"' : ""} class="vh">`;
+    if (!klaar) lab.style.cssText = "font-size:22px;padding:16px 22px;width:100%;margin-top:8px";
+    const inp = lab.querySelector("input");
+    inp.onchange = async () => {
+      const f = inp.files[0]; if (!f) return;
+      msg.textContent = "Foto versturen…";
+      const blob = await verkleinFoto(f), pad = `papa/${day}-${crypto.randomUUID().slice(0,8)}.jpg`;
+      const up = await sb.storage.from("filmpjes").upload(pad, blob, {contentType: blob.type || "image/jpeg"});
+      if (up.error){ msg.textContent = `Versturen lukte niet (${up.error.message}).`; return; }
+      fotoUrls[pad] = URL.createObjectURL(blob);
+      const eerste = !log.foto;
+      save({foto: pad, opdracht, [t.id]: 1}, eerste ? {cat: "puzzel", title: "Mooie foto!", text: "De familie kan hem nu zien."} : null);
+    };
+    return lab;
   };
-  card.append(lab, msg);
+  card.append(
+    knop(klaar ? "Andere foto maken" : "📷 Maak de foto", true),
+    knop(klaar ? "Andere foto uit album kiezen" : "🖼️ Kies uit fotoalbum", false),
+    msg);
   return card;
 }
 // Papa's fotoalbum: alle opdrachtfoto's, nieuwste eerst.
