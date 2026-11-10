@@ -81,8 +81,9 @@ button.big{font-size:22px;padding:16px 22px;width:100%;max-width:420px}
 .ccel.vast .cl{color:var(--done);border-bottom-color:var(--done)}
 .ccel.sel .cl{background:var(--sun);color:#15262B;border-bottom-color:var(--brand)}
 .ccel.sel small{color:var(--ink);font-weight:700}
-.ccel.fout .cl{color:var(--danger);border-bottom-color:var(--danger)}
+.ccel.fout .cl{background:var(--danger);color:#fff;border-bottom-color:var(--danger)}
 .ccel:disabled{opacity:1;cursor:default}
+.fouten{font-size:20px!important;color:var(--ink)!important;letter-spacing:2px;margin:4px 0}
 .hulp{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .hulp > button{align-self:flex-start}
 .hulpvraag{font:600 20px/1.35 var(--display)!important;color:var(--ink)!important;margin:0}
@@ -514,7 +515,7 @@ let viewDay = null;
 const isToday = () => day === iso(new Date());
 function goDay(d){
   viewDay = d === iso(new Date()) ? null : d;
-  day = d; log = recent.find(r => r.datum === d) || {}; invoer = ""; codeSel = null; codeFoutZien = false;
+  day = d; log = recent.find(r => r.datum === d) || {}; invoer = ""; codeSel = null; codeFlits = null;
   renderHeader(); renderToday(); scrollTo({top: 0, behavior: "smooth"});
 }
 async function loadAll(){
@@ -1215,11 +1216,13 @@ function codeSleutel(d){
   for (let i = uniek.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [uniek[i], uniek[j]] = [uniek[j], uniek[i]]; }
   return {nr, gratis: uniek.slice(0, Math.floor(uniek.length / 5)), uniek};
 }
-let codeSel = null, codeFoutZien = false;
-// Wat er bij een nummer staat: gratis of hulpletter = vast, anders wat papa invulde.
+let codeSel = null, codeFlits = null; // codeFlits = nummer dat even rood oplicht na een fout
+// Maximaal 3 fouten: een foute letter blijft niet staan, bij de 3e fout is de puzzel voorbij.
+const MAXFOUT = 3;
+// Wat er bij een nummer staat: gratis of hulpletter = vast, anders wat papa goed invulde.
 function codeStand(s){
   const vast = new Set([...s.gratis, ...(log.codeHulp || [])]), gok = log.code || {};
-  const letterBij = L => vast.has(L) ? L : gok[s.nr[L]] || "";
+  const letterBij = L => vast.has(L) || gok[s.nr[L]] === L ? L : "";
   return {vast, gok, letterBij};
 }
 // Letters die nog niet vast staan en nog niet goed ingevuld zijn.
@@ -1251,9 +1254,7 @@ function hulpBlokCode(s){
     if (!inp.value.trim()){ inp.focus(); return; }
     if (!hulpVraag.a.map(normAntw).includes(normAntw(inp.value))){ toast("Helaas, dat is het niet. Probeer nog eens!"); inp.select(); return; }
     const kies = openLetters(s), L = kies[Math.floor(Math.random() * kies.length)];
-    // Stond die letter al bij een ander nummer ingevuld, dan haalt de hulpletter hem daar weg.
-    const code = Object.fromEntries(Object.entries(log.code || {}).filter(([n, g]) => g !== L && +n !== s.nr[L]));
-    log = {...log, code, codeHulp: [...gehad, L], ...(hulpVraag.som ? {} : {hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]})};
+    log = {...log, codeHulp: [...gehad, L], ...(hulpVraag.som ? {} : {hulpRaadsels: [...(log.hulpRaadsels || []), hulpVraag.id]})};
     hulpVraag = null; hulpAntwoord = ""; renderToday(); saveLog(log);
     toast(`Goed zo! Nummer ${s.nr[L]} is de ${L}`);
   };
@@ -1267,16 +1268,16 @@ function renderCode(t){
   // Oude dagen met het woordspel: opgelost als de laatste poging het woord was.
   const opgelost = log.codeOpgelost ?? (log.pogingen ? log.pogingen.at(-1) === codeLetters(day) : false);
   const {vast, letterBij} = codeStand(s), speel = kanAfvinken() && !klaar;
-  if (speel && (codeSel == null || vast.has(Object.keys(s.nr).find(L => s.nr[L] === codeSel)))) codeSel = volgendNummer(s, null);
+  if (speel && (codeSel == null || letterBij(Object.keys(s.nr).find(L => s.nr[L] === codeSel)))) codeSel = volgendNummer(s, null);
   const card = document.createElement("div");
   card.className = "card task" + (klaar ? " alldone" : "");
-  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : "Elke letter heeft een eigen nummer. Hetzelfde nummer is overal dezelfde letter. Tik op een vakje en kies een letter. Kun jij lezen wat er staat?"}</p>`;
+  card.innerHTML = `<h3>${esc(t.naam)}</h3><p>${t.uitleg ? esc(t.uitleg) : `Elke letter heeft een eigen nummer. Hetzelfde nummer is overal dezelfde letter. Tik op een vakje en kies een letter. Kun jij lezen wat er staat? Je mag ${MAXFOUT} fouten maken.`}</p>`;
   const grid = document.createElement("div"); grid.className = "cgrid";
   grid.innerHTML = delen.map(w => `<div class="cword">${w.map(x => {
     if (!x.l) return `<span class="ccel teken"><span class="cl">${esc(x.t)}</span><small></small></span>`;
     const n = s.nr[x.l], toon = klaar ? x.l : letterBij(x.l);
-    const kl = [vast.has(x.l) ? "vast" : "", speel && n === codeSel ? "sel" : "", !klaar && codeFoutZien && toon && toon !== x.l ? "fout" : ""].filter(Boolean).join(" ");
-    return `<button type="button" class="ccel ${kl}" data-n="${n}" ${speel && !vast.has(x.l) ? "" : "disabled"} aria-label="Nummer ${n}${toon ? ", " + toon : ""}"><span class="cl">${toon}</span><small>${n}</small></button>`;
+    const kl = [vast.has(x.l) ? "vast" : "", speel && n === codeSel ? "sel" : "", speel && n === codeFlits ? "fout" : ""].filter(Boolean).join(" ");
+    return `<button type="button" class="ccel ${kl}" data-n="${n}" ${speel && !toon ? "" : "disabled"} aria-label="Nummer ${n}${toon ? ", " + toon : ""}"><span class="cl">${toon}</span><small>${n}</small></button>`;
   }).join("")}</div>`).join("");
   grid.onclick = e => { const b = e.target.closest("button[data-n]"); if (b && !b.disabled){ codeSel = +b.dataset.n; renderToday(); } };
   card.appendChild(grid);
@@ -1296,25 +1297,16 @@ function renderCode(t){
     card.appendChild(reactieBlok("woord"));
     return card;
   }
-  const ingevuld = s.uniek.filter(L => letterBij(L)).length;
-  if (!kanAfvinken()){ card.insertAdjacentHTML("beforeend", `<p>${Object.keys(log.code || {}).length ? `${ingevuld} van de ${s.uniek.length} letters ingevuld.` : "Nog niet gespeeld vandaag."}</p>`); return card; }
-  // Alles ingevuld maar nog niet goed: laten weten, en op verzoek de foute letters rood maken.
-  if (ingevuld === s.uniek.length){
-    const fout = s.uniek.filter(L => letterBij(L) !== L).length;
-    card.insertAdjacentHTML("beforeend", `<p class="note">Alles is ingevuld, maar nog niet alles klopt.</p>`);
-    if (!codeFoutZien){
-      const b = document.createElement("button"); b.type = "button"; b.textContent = `Laat zien wat fout is (${fout})`;
-      b.onclick = () => { codeFoutZien = true; renderToday(); };
-      card.appendChild(b);
-    }
-  }
+  const ingevuld = s.uniek.filter(L => letterBij(L)).length, fouten = log.codeFouten || 0;
+  const foutRij = `<p class="fouten" aria-label="${fouten} van de ${MAXFOUT} fouten">Fouten: ${"❌".repeat(fouten)}${"⬜".repeat(Math.max(0, MAXFOUT - fouten))}</p>`;
+  if (!kanAfvinken()){ card.insertAdjacentHTML("beforeend", `<p>${ingevuld > s.gratis.length || fouten ? `${ingevuld} van de ${s.uniek.length} letters goed.` : "Nog niet gespeeld vandaag."}</p>${foutRij}`); return card; }
+  card.insertAdjacentHTML("beforeend", foutRij);
   // Toetsenbord: letters die al ergens staan zijn grijs.
   const gebruikt = new Set(s.uniek.map(letterBij).filter(Boolean));
   const kbd = document.createElement("div"); kbd.className = "wkbd";
   for (const rij of ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]){
     const r = document.createElement("div");
     for (const L of rij) r.insertAdjacentHTML("beforeend", `<button class="${gebruikt.has(L) ? "mis" : ""}" data-k="${L}">${L}</button>`);
-    if (rij === "ZXCVBNM") r.insertAdjacentHTML("beforeend", `<button class="wide" data-k="DEL" aria-label="Letter weg">⌫</button>`);
     kbd.appendChild(r);
   }
   kbd.onclick = e => { const k = e.target.closest("button")?.dataset.k; if (k) toetsCode(t, k); };
@@ -1326,28 +1318,31 @@ function renderCode(t){
 }
 // Het volgende nummer (in leesvolgorde) dat nog leeg is; anders het volgende open nummer.
 function volgendNummer(s, na){
-  const {vast, gok} = codeStand(s);
-  const volgorde = [...new Set(codeLetters(day))].filter(L => !vast.has(L)).map(L => s.nr[L]);
+  const {letterBij} = codeStand(s);
+  const volgorde = [...new Set(codeLetters(day))].filter(L => !letterBij(L)).map(L => s.nr[L]);
   if (!volgorde.length) return null;
   const start = na == null ? -1 : volgorde.indexOf(na), rond = [...volgorde.slice(start + 1), ...volgorde.slice(0, start + 1)];
-  return rond.find(n => !gok[n]) ?? (na ?? volgorde[0]);
+  return rond[0];
 }
 function toetsCode(t, k){
   const s = codeSleutel(day);
   if (codeSel == null) return;
-  const code = {...(log.code || {})};
-  if (k === "DEL") delete code[codeSel];
-  else {
-    if (codeStand(s).vast.has(k)){ toast(`De ${k} staat al vast bij nummer ${s.nr[k]}`); return; }
-    // Een letter hoort maar bij één nummer: stond hij ergens anders, dan gaat hij daar weg.
-    for (const n in code) if (code[n] === k) delete code[n];
-    code[codeSel] = k;
+  const L = Object.keys(s.nr).find(x => s.nr[x] === codeSel), {letterBij} = codeStand(s);
+  // Een letter die al ergens goed staat, telt niet als fout.
+  if (s.uniek.some(x => letterBij(x) === k)){ toast(`De ${k} staat al bij nummer ${s.nr[k]}`); return; }
+  if (k !== L){
+    const fouten = (log.codeFouten || 0) + 1;
+    if (fouten >= MAXFOUT){ save({codeFouten: fouten, puzzel: true, codeOpgelost: false, [t.id]: 1}, {cat: "puzzel", title: "Bijna!", text: `Dat was je ${MAXFOUT}e fout. Er stond: ${codeTekst(day)}`}); return; }
+    log = {...log, codeFouten: fouten};
+    codeFlits = codeSel; setTimeout(() => { if (codeFlits != null){ codeFlits = null; renderToday(); } }, 1200);
+    toast(`Nummer ${codeSel} is geen ${k}. Nog ${MAXFOUT - fouten} ${MAXFOUT - fouten === 1 ? "fout" : "fouten"} over.`);
+    renderToday(); saveLog(log); return;
   }
-  codeFoutZien = false;
+  const code = {...(log.code || {}), [codeSel]: k};
   log = {...log, code};
-  const {letterBij} = codeStand(s);
-  if (s.uniek.every(L => letterBij(L) === L)){ save({code, puzzel: true, codeOpgelost: true, [t.id]: 1}, {cat: "puzzel", title: "Opgelost!", text: codeTekst(day)}); return; }
-  if (k !== "DEL") codeSel = volgendNummer(s, codeSel);
+  codeFlits = null;
+  if (s.uniek.every(x => codeStand(s).letterBij(x) === x)){ save({code, puzzel: true, codeOpgelost: true, [t.id]: 1}, {cat: "puzzel", title: "Opgelost!", text: codeTekst(day)}); return; }
+  codeSel = volgendNummer(s, codeSel);
   renderToday(); saveLog(log);
 }
 
@@ -1594,7 +1589,7 @@ function renderPlan(){
     const extra = [l.hint && "hint", (l.codeHulp || l.hulpPos)?.length && `${(l.codeHulp || l.hulpPos).length} hulpletter${(l.codeHulp || l.hulpPos).length > 1 ? "s" : ""}`].filter(Boolean).map(x => ` (met ${x})`).join("");
     const uitslag = !l.puzzel ? ((l.code && Object.keys(l.code).length) || l.pogingen?.length ? "– niet af" : "– niet gespeeld")
       : l.pogingen ? (l.pogingen.at(-1) === woordOp(d) ? `✓ geraden in ${l.pogingen.length}${extra}` : "✗ niet geraden")
-      : l.codeOpgelost ? `✓ opgelost${extra}` : "✗ opgegeven";
+      : l.codeOpgelost ? `✓ opgelost${l.codeFouten ? ` met ${l.codeFouten} ${l.codeFouten === 1 ? "fout" : "fouten"}` : " zonder fouten"}${extra}` : l.codeFouten >= MAXFOUT ? `✗ ${MAXFOUT} fouten` : "✗ opgegeven";
     const w = pl.woord ? `${isCode(d) ? "🔢 " : ""}${esc(pl.woord)} ${uitslag}` : "";
     const o = pl.opdracht || l.opdracht ? `foto van ${esc(pl.opdracht || l.opdracht)} ${l.foto ? "📷 gemaakt" : "– geen foto"}` : "";
     const tekst = o => draad(d, o).map(r => `💬 ${esc(r.van)}: “${esc(r.tekst)}”`).join("<br>");
