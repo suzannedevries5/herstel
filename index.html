@@ -244,6 +244,14 @@ input,select,textarea{font-size:max(16px,1em)!important}
     </div>
   </section>
 
+  <section id="viewPauze" class="view" hidden>
+    <div class="card" style="text-align:center;padding:2.5rem 1.25rem">
+      <div style="font-size:3rem" aria-hidden="true">🔍</div>
+      <h2>Er komt iets nieuws aan…</h2>
+      <p>Nog even geduld. Dit weekend is het zover!</p>
+    </div>
+  </section>
+
   <section id="viewToday" class="view" hidden>
     <div class="card past" id="pastBanner" hidden>
       <p>Je kijkt naar <b id="pastName"></b>.<span id="pastHint"> Vergeten iets af te vinken? Dat kan hier nog.</span></p>
@@ -502,7 +510,7 @@ function isKlaar(l, date){ return tasksFor(date).every(t => (l[t.id]||0) >= t.ke
 const fmtL = ml => (ml/1000).toLocaleString("nl-NL",{maximumFractionDigits:2}) + " L";
 function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>t.hidden=true, 2500); }
 function show(which){
-  for (const v of ["Login","Today","Setup","Family","Plan"]) $("view"+v).hidden = v.toLowerCase()!==which;
+  for (const v of ["Login","Today","Setup","Family","Plan","Pauze"]) $("view"+v).hidden = v.toLowerCase()!==which;
   for (const [id, v] of [["tabToday","today"],["tabMsgs","family"],["tabPlan","plan"],["tabSetup","setup"]]) $(id).className = which===v ? "primary" : "";
   if (which==="setup") renderSetup();
   if (which==="family") renderMsgs();
@@ -1898,6 +1906,8 @@ async function boot(){
   }
   me = rij;
   canSetup = me.rol === "beheer";
+  // Pauze tot het weekend: papa en familie zien alleen "er komt iets nieuws aan". Beheer ziet alles.
+  if (!canSetup && new Date() < new Date("2026-11-21T00:00:00")){ show("pauze"); return; }
   $("tabs").hidden = !(canSetup || me.rol === "familie");
   $("tabSetup").hidden = !canSetup;
   for (const l of document.querySelectorAll(".weeklabel")) l.hidden = !canSetup; // weekkeuze alleen voor beheer
